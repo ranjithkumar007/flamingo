@@ -1,8 +1,10 @@
 import socket
+import io
+import pickle
 from ..node import network_params
 
 class Message:
-	def __init__(self, msg_type, content):
+	def __init__(self, msg_type = None, content = None):
 		self.msg_type = msg_type
 		self.content = content
 		# contains :
@@ -10,10 +12,15 @@ class Message:
 
 	def send_msg(self, to, sock = None):
 		if not sock:
-			sock = socket.socket()
-			sock.connect((to, network_params.CLIENT_RECV_PORT))
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			while 1:
+				try:
+					sock.connect((to, network_params.CLIENT_RECV_PORT))
+					break
+				except ConnectionRefusedError:
+					pass
 
-		msg_data = io.BytesIO(pickle.dumps(self.msg))
+		msg_data = io.BytesIO(pickle.dumps(self))
 
 		while True:
 			chunk = msg_data.read(network_params.BUFFER_SIZE)
@@ -25,6 +32,7 @@ class Message:
 
 		sock.shutdown(socket.SHUT_WR)
 		sock.close()
+		print("SENT BRO")
 
 	def recv_msg(self, conn):
 		data = conn.recv(network_params.BUFFER_SIZE)

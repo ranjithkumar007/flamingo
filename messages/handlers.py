@@ -1,4 +1,4 @@
-from message import Message
+from .message import Message
 import multiprocessing as mp
 import time
 
@@ -12,7 +12,7 @@ def backup_elect_handler(my_node):
 
 def le_result_handler(my_node):
 	print("le first pass done")
-	my_node.is_elected = True
+	my_node.le_elected = True
 	msg = Message('LE_TERMINATE')
 	for ip in my_node.children:
 		msg.send_msg(to = ip)
@@ -37,7 +37,7 @@ def sleep_and_ping(to):
 
 def heartbeat_handler(my_node, recv_ip, content):
 	# call matchmaker
-	for 
+	# for 
 
 	msg = Message('HEARTBEAT_ACK')
 	msg.send_msg(to = recv_ip)
