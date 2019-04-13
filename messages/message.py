@@ -1,3 +1,6 @@
+import socket
+from ..node import network_params
+
 class Message:
 	def __init__(self, msg_type, content):
 		self.msg_type = msg_type
@@ -24,12 +27,12 @@ class Message:
 		sock.close()
 
 	def recv_msg(self, conn):
-		data = conn.recv(network_params.MAX_RECV_SIZE)
+		data = conn.recv(network_params.BUFFER_SIZE)
 		data_list = []
 
 		while data:
 			data_list.append(data)
-			data = conn.recv(network_params.MAX_RECV_SIZE)
+			data = conn.recv(network_params.BUFFER_SIZE)
 
 		data = b''.join(data_list)
 		self.msg = pickle.loads(data)

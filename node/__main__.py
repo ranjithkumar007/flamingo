@@ -3,6 +3,7 @@ import socket
 import sys
 import os
 from multiprocessing import Process, Manager
+from . import network_params
 
 from .node import Node
 from ..messages.message import Message
@@ -20,7 +21,7 @@ def build_socket():
 def initiate_leader_election(my_node):
     msg = Message('LE_QUERY', content = my_node.self_ip)
     for ip in my_node.adj_nodes_ips:
-        send_msg(msg, to = ip)
+        msg.send_msg(to = ip)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -51,12 +52,12 @@ def main():
     interface_p.start()
 
     # Leader election
-    # initiate_leader_election(my_node)
+    initiate_leader_election(my_node)
 
     # start receiving messages
-    # msg_socket = build_socket()
+    msg_socket = build_socket()
     
-    while 0:
+    while True:
         conn, recv_addr = msg_socket.accept()
 
         msg = recv_msg(conn)
