@@ -1,0 +1,9 @@
+Name job_name
+min_memory 4
+max_memory 6
+cores 2
+exec_path None
+input_path None
+output_path None
+error_path None
+priority 2
