@@ -10,4 +10,3 @@ def Manager():
     m = MyManager()
     m.start()
     return m
-

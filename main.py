@@ -7,7 +7,8 @@ from multiprocessing import Process
 from messages import network_params
 
 from jobs.manager import Manager
-from .node import Node
+from jobs.jobqueue import JobPQ
+from utils.node import Node
 from messages.message import Message
 from messages import handlers
 from jobs.submit_interface import submit_interface
@@ -15,7 +16,6 @@ from jobs.submit_interface import submit_interface
 def build_socket(self_ip):
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
-    # print(socket.gethostname())
     msg_socket.bind((self_ip, network_params.CLIENT_RECV_PORT))
     msg_socket.listen(network_params.MAX_OUTSTANDING_REQUESTS)
 
@@ -50,7 +50,7 @@ def main():
 
     my_node.yet_to_submit = manager.dict()
     my_node.jobQ = manager.Queue()
-    # my_node.leaderQ = 
+    my_node.leaderQ = JobPQ(manager)
 
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
@@ -60,9 +60,9 @@ def main():
 
     # Leader election
     initiate_leader_election(my_node)
-
     
     msg = Message()
+
     while 1:
         conn, recv_addr = msg_socket.accept()
 
@@ -84,11 +84,11 @@ def main():
             hadlers.backup_query_handler(my_node, recv_addr, msg.content)
 
 
-        if my_node.le_elected and start_daemons:
-            start_daemons = False
+        # if my_node.le_elected and start_daemons:
+        #     start_daemons = False
 
-            if my_node.self_ip == my_node.root_ip: # Leader
-                collector_p = Process(target=initiate_collector, args=(my_node.all_ips))
+        #     if my_node.self_ip == my_node.root_ip: # Leader
+        #         collector_p = Process(target=initiate_collector, args=(my_node.all_ips))
 
 
 if __name__ == '__main__':

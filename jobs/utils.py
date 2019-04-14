@@ -9,3 +9,5 @@ def parse_job_file(filepath):
 
 		return specs
 
+def calculate_job_priority(job_ob):
+	

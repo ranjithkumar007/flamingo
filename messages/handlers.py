@@ -35,9 +35,11 @@ def sleep_and_ping(to):
 	msg = Message('ARE_YOU_ALIVE')
 	msg.send_msg(to)
 
+# both task and resource manager combined
 def heartbeat_handler(my_node, recv_ip, content):
 	# call matchmaker
-	# for 
+	node_jobQ, node_res = content
+	
 
 	msg = Message('HEARTBEAT_ACK')
 	msg.send_msg(to = recv_ip)

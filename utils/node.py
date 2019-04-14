@@ -1,5 +1,4 @@
 import queue
-from jobs.jobqueue import JobPQ
 
 class Node:
 	def __init__(self, self_ip, adj_nodes_ips):
@@ -15,10 +14,10 @@ class Node:
 		self.par = -1
 		
 		self.jobQ = queue.Queue()
-		self.resources = {}
-		self.yet_to_submit = {}
+		self.resources = None
+		self.yet_to_submit = None
 		self.last_jobs_sent = 0
 
-		self.leader_jobQ = JobPQ()
+		self.leader_jobQ = None
 		self.all_resources = {}
 
