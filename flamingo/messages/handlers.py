@@ -1,7 +1,33 @@
 from .message import Message
-from .utils import send_msg
+from .utils import send_msg, get_resources
 import multiprocessing as mp
 import time
+from .utils import send_file
+import os
+
+def exec_job_handler(my_node, job):
+	inp_fp = job.attr['input_path']
+	exec_fp = job.attr['exec_path']
+
+	if not os.path.exists(params.EXEC_DIR):
+		os.makedirs(params.EXEC_DIR)
+
+	if not os.path.exists(os.path.join(params.EXEC_DIR, job.job_id)):
+		os.makedirs(os.path.join(params.EXEC_DIR, job.job_id))
+
+	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
+	send_msg(msg, to = job.source_ip)
+
+def query_files_handler(my_node, recv_ip, content):
+	job_id = content[0]
+	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "input")
+	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "executable")
+	
+def files_content_handler(my_node, content):
+	job_id, file_ty, file_content = content
+
+	with open(os.path.join(os.path.join(params.EXEC_DIR, job.job_id), file_ty), 'wb') as fp:
+		fp.write(file_content)
 
 def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
@@ -27,7 +53,9 @@ def heartbeat_ack_handler(my_node):
 	my_node.last_jobs_sent = 0
 
 def send_heartbeat(my_node, to):
-	msg = Message('HEARTBEAT', content = [my_node.jobQ, my_node.resources])
+	my_node.resources[my_node.self_ip] = get_resources()
+	
+	msg = Message('HEARTBEAT', content = [my_node.jobQ, my_node.resources[my_node.self_ip]])
 	my_node.last_jobs_sent = msg.content[0].qsize()
 	send_msg(msg, to)
 
@@ -40,6 +68,11 @@ def sleep_and_ping(to):
 def heartbeat_handler(my_node, recv_ip, content):
 	# call matchmaker
 	node_jobQ, node_res = content
+	my_node.resources[recv_ip] = node_res
+
+	while not node_jobQ.empty():
+		my_node.leader_jobPQ.put(node_jobQ.get())
+
 	
 
 	msg = Message('HEARTBEAT_ACK')

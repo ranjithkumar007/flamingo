@@ -11,7 +11,7 @@ def generate_id(self_ip):
 def submit_interface(my_node, newstdin):
 	sys.stdin = newstdin
 	while True:
-		client_id = input('\n>>Enter your user id')
+		client_id = input('\n>>Enter your user id\n')
 		# add authentication
 
 		while True:
@@ -20,14 +20,9 @@ def submit_interface(my_node, newstdin):
 			slots = inp.split(' ')
 			command = slots[0]
 
-			# parser = argparse.ArgumentParser(slots[1:])
-			# parser.add_argument('--job_description_file', help = "Path to Job description file", type = str)
-			# parser.add_argument('--job_id', help = "Job id", type = str)
-
-			# args = vars(parser.parse_args())
 			if command == "submit_job":
-				# assert not args['job_description_file'], "Path to job description file is not provided. specify it using --job_description_file flag"
-				# jd = args['job_description_file']
+
+				assert len(slots) == 3 and slots[1] == '--filepath', "Path to job description file is not provided. specify it using --filepath flag"
 				jd = slots[2]
 
 				job_ob = Job()

@@ -14,10 +14,12 @@ class Node:
 		self.par = -1
 		
 		self.jobQ = queue.Queue()
-		self.resources = None
+		self.resources = {}
 		self.yet_to_submit = None
 		self.last_jobs_sent = 0
 
-		self.leader_jobQ = None
-		self.all_resources = {}
+		self.running_jobs = None
+
+		self.leader_jobPQ = None
+		self.matchmaker_pid = None
 

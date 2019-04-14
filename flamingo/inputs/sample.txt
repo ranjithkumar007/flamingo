@@ -1,6 +1,5 @@
 Name job_name
-min_memory 4
-max_memory 6
+max_memory 4
 cores 2
 exec_path None
 input_path None

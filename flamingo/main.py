@@ -4,8 +4,9 @@ import sys
 import os
 import time
 from multiprocessing import Process
-from messages import network_params
+import messages.params
 
+from jobs.matchmaker import matchmaking
 from messages.utils import send_msg, recv_msg
 from jobs.manager import Manager
 from jobs.jobqueue import JobPQ
@@ -17,8 +18,8 @@ from jobs.submit_interface import submit_interface
 def build_socket(self_ip):
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
-    msg_socket.bind((self_ip, network_params.CLIENT_RECV_PORT))
-    msg_socket.listen(network_params.MAX_OUTSTANDING_REQUESTS)
+    msg_socket.bind((self_ip, messages.params.CLIENT_RECV_PORT))
+    msg_socket.listen(messages.params.MAX_OUTSTANDING_REQUESTS)
 
     return msg_socket
 
@@ -46,15 +47,20 @@ def main():
 
     my_node = Node(self_ip, adj_nodes_ips)
 
-    # newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
-    # manager = Manager()
+    newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
+    manager = Manager()
 
-    # my_node.yet_to_submit = manager.dict()
-    # my_node.jobQ = manager.Queue()
-    # my_node.leaderQ = JobPQ(manager)
+    my_node.yet_to_submit = manager.dict()
+    my_node.jobQ = manager.Queue()
+    my_node.resources = manager.dict()
+    my_node.running_jobs = manager.dict()
+    my_node.leader_jobPQ = JobPQ(manager)
 
-    # interface_p = Process(target = submit_interface, args = (my_node, newstdin))
-    # interface_p.start()
+    interface_p = Process(target = submit_interface, args = (my_node, newstdin))
+    interface_p.start()
+
+    my_node.matchmaker_pid = Process(target = matchmaking, args = (my_node))
+    my_node.matchmaker_pid.start()
 
     # start receiving messages
     msg_socket = build_socket(self_ip)
@@ -68,6 +74,7 @@ def main():
         conn, recv_addr = msg_socket.accept()
         recv_addr = recv_addr[0]
         msg = recv_msg(conn)
+        print('received msg of type %s from %s' %(msg.msg_type, recv_addr))
 
         if msg.msg_type == 'LE_QUERY':
             handlers.le_query_handler(my_node, recv_addr, msg.content)
@@ -79,6 +86,12 @@ def main():
             handlers.le_terminate_handler(my_node)
         elif msg.msg_type == 'BACKUP_QUERY':
             handlers.backup_query_handler(my_node)
+        elif msg.msg_type == 'EXEC_JOB':
+            handlers.exec_job_handler(my_node)
+        elif msg.msg_type == 'QUERY_FILES':
+            handlers.query_files_handler(my_node)
+        elif msg.msg_type == 'FILES_CONTENT':
+            handlers.files_content_handler(my_node, msg.content)
 
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False

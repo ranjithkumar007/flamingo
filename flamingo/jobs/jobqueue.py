@@ -10,7 +10,7 @@ class JobPQ:
 
 		return self.pq.get()[1]
 
-
 	def put(self, job_ob):
-		job_priority = calculate_job_priority(job_ob)
+		job_priority = calculate_job_priority(job_ob) * -1
+		
 		self.pq.put((job_priority, job_ob))
