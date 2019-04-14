@@ -1,8 +1,8 @@
 Name job_name
 max_memory 4
 cores 2
-exec_path None
-input_path None
+exec_path inputs/sample_exec
+input_path inputs/sample_input
 output_path None
 error_path None
 priority 2

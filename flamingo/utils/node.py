@@ -13,7 +13,7 @@ class Node:
 		self.le_elected = False
 		self.par = -1
 		
-		self.jobQ = queue.Queue()
+		self.jobQ = None
 		self.resources = {}
 		self.yet_to_submit = None
 		self.last_jobs_sent = 0

@@ -6,7 +6,7 @@ import time
 from multiprocessing import Process
 import messages.params
 
-from jobs.matchmaker import matchmaking
+from messages.matchmaker import matchmaking
 from messages.utils import send_msg, recv_msg
 from jobs.manager import Manager
 from jobs.jobqueue import JobPQ
@@ -51,7 +51,7 @@ def main():
     manager = Manager()
 
     my_node.yet_to_submit = manager.dict()
-    my_node.jobQ = manager.Queue()
+    my_node.jobQ = manager.list()
     my_node.resources = manager.dict()
     my_node.running_jobs = manager.dict()
     my_node.leader_jobPQ = JobPQ(manager)
@@ -59,7 +59,7 @@ def main():
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
 
-    my_node.matchmaker_pid = Process(target = matchmaking, args = (my_node))
+    my_node.matchmaker_pid = Process(target = matchmaking, args = (my_node, ))
     my_node.matchmaker_pid.start()
 
     # start receiving messages
@@ -90,6 +90,8 @@ def main():
             handlers.exec_job_handler(my_node)
         elif msg.msg_type == 'QUERY_FILES':
             handlers.query_files_handler(my_node)
+        elif msg.msg_type == 'HEARTBEAT':
+            handlers.heartbeat_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'FILES_CONTENT':
             handlers.files_content_handler(my_node, msg.content)
 

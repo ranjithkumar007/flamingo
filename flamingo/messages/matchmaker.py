@@ -1,12 +1,13 @@
 import signal
 import sys
-from ..messages.message import Message
-from ..messages.utils import send_msg
+from .message import Message
+from .utils import send_msg
 
 def signal_handler(sig, frame):
 	if sig == signal.SIGUSR1:
 		pass
 
+# decrement resources
 def match(job,resources,running_jobs):
 	# greedy approach
 	mem = job.attr['max_memory']

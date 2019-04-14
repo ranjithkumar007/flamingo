@@ -4,6 +4,7 @@ import  time
 import uuid
 import sys
 from .job import Job
+from .utils import parse_job_file
 
 def generate_id(self_ip):
 	return hash(self_ip + str(uuid.uuid4()))
@@ -22,7 +23,10 @@ def submit_interface(my_node, newstdin):
 
 			if command == "submit_job":
 
-				assert len(slots) == 3 and slots[1] == '--filepath', "Path to job description file is not provided. specify it using --filepath flag"
+				if (not (len(slots) == 3 and slots[1] == '--filepath')):
+					print("Path to job description file is not provided. specify it using --filepath flag")
+					continue
+
 				jd = slots[2]
 
 				job_ob = Job()

@@ -4,6 +4,7 @@ import pickle
 from . import params
 from .message import Message
 import psutil
+import os
 from functools import partial
 
 def get_resources():
@@ -11,11 +12,11 @@ def get_resources():
 		'memory' : psutil.virtual_memory().available >> 20,
 		'cpu_usage' : psutil.cpu_percent(),
 		'cores' : psutil.cpu_count(),
-		'process_load' : psutil.getloadavg()
+		'process_load' : os.getloadavg()
 	}
 	return res
 
-def create_socket():
+def create_socket(to):
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	while 1:
 		try:
@@ -29,7 +30,7 @@ def create_socket():
 # check if alive, return true/false
 def send_msg(msg, to, sock = None, close_sock = True):
 	if not sock:
-		sock = create_socket()
+		sock = create_socket(to)
 
 	msg_data = io.BytesIO(pickle.dumps(msg))
 
@@ -42,11 +43,12 @@ def send_msg(msg, to, sock = None, close_sock = True):
 		sock.send(chunk)
 
 	sock.shutdown(socket.SHUT_WR)
+	print('sent msg of type %s to %s' % (msg.msg_type, to))
 	if close_sock:
 		sock.close()
 
 def send_file(filepath, to, job_id, file_ty):
-	sock = create_socket()
+	sock = create_socket(to)
 
 	msg = Message('FILES_CONTENT')
 	msg.content = [job_id, file_ty]

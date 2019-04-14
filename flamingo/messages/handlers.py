@@ -4,6 +4,7 @@ import multiprocessing as mp
 import time
 from .utils import send_file
 import os
+import signal
 
 def exec_job_handler(my_node, job):
 	inp_fp = job.attr['input_path']
@@ -46,16 +47,25 @@ def le_result_handler(my_node):
 
 def heartbeat_ack_handler(my_node):
 	for i in range(my_node.last_jobs_sent):
-		temp = my_node.jobQ.get()
+		temp = my_node.jobQ[0]
+		my_node.jobQ.remove(temp)
 		rid = temp.job_id
 		del my_node.yet_to_submit[rid]
 
 	my_node.last_jobs_sent = 0
 
 def send_heartbeat(my_node, to):
-	my_node.resources[my_node.self_ip] = get_resources()
+	cur_res = get_resources()
+	my_node.resources[my_node.self_ip] = cur_res
 	
-	msg = Message('HEARTBEAT', content = [my_node.jobQ, my_node.resources[my_node.self_ip]])
+	jobQ_cp = []
+	for job_i in my_node.jobQ:
+		jobQ_cp.append(job_i)
+
+	msg = Message('HEARTBEAT', content = [jobQ_cp, cur_res])
+	print(msg.content[0])
+	print(msg.content[1])
+	
 	my_node.last_jobs_sent = msg.content[0].qsize()
 	send_msg(msg, to)
 
@@ -70,10 +80,11 @@ def heartbeat_handler(my_node, recv_ip, content):
 	node_jobQ, node_res = content
 	my_node.resources[recv_ip] = node_res
 
-	while not node_jobQ.empty():
-		my_node.leader_jobPQ.put(node_jobQ.get())
+	for job_i in node_jobQ:
+		my_node.leader_jobPQ.put(job_i)
 
-	
+	# wake up matchmaker
+	os.kill(my_node.matchmaker_pid, signal.SIGUSR1)
 
 	msg = Message('HEARTBEAT_ACK')
 	send_msg(msg, to = recv_ip)
