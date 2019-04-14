@@ -1,4 +1,5 @@
 from .message import Message
+from .utils import send_msg
 import multiprocessing as mp
 import time
 
@@ -64,8 +65,8 @@ def le_query_handler(my_node, recv_ip, new_root_ip):
 
 		msg = Message('LE_QUERY', content = my_node.root_ip)
 		for ip in my_node.adj_nodes_ips:
-			if ip != recv_ip:
-				send_msg(msg, to = ip)
+			# if ip != recv_ip:
+			send_msg(msg, to = ip)
 
 		if len(my_node.adj_nodes_ips) == 1:
 			msg = Message('LE_ACCEPT', content = my_node.root_ip)
@@ -82,12 +83,12 @@ def le_accept_handler(my_node, recv_ip, new_root_ip, is_accept = True):
 		
 		my_node.le_acks += 1
 
-		if my_node.le_acks == (len(my_node.adj_nodes_ips) - 1):
+		if my_node.le_acks == len(my_node.adj_nodes_ips):
 			if my_node.root_ip == my_node.self_ip:
 				# leader election completed
 				backup_elect_handler(my_node)
 				# propogate that you are the finally elected leader
-				le_result_handler()
+				le_result_handler(my_node)
 			else:
 				msg = Message('LE_ACCEPT', content = my_node.root_ip)
 				send_msg(msg, to = my_node.par)

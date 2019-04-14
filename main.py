@@ -6,6 +6,7 @@ import time
 from multiprocessing import Process
 from messages import network_params
 
+from messages.utils import send_msg, recv_msg
 from jobs.manager import Manager
 from jobs.jobqueue import JobPQ
 from utils.node import Node
@@ -45,15 +46,15 @@ def main():
 
     my_node = Node(self_ip, adj_nodes_ips)
 
-    newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
-    manager = Manager()
+    # newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
+    # manager = Manager()
 
-    my_node.yet_to_submit = manager.dict()
-    my_node.jobQ = manager.Queue()
-    my_node.leaderQ = JobPQ(manager)
+    # my_node.yet_to_submit = manager.dict()
+    # my_node.jobQ = manager.Queue()
+    # my_node.leaderQ = JobPQ(manager)
 
-    interface_p = Process(target = submit_interface, args = (my_node, newstdin))
-    interface_p.start()
+    # interface_p = Process(target = submit_interface, args = (my_node, newstdin))
+    # interface_p.start()
 
     # start receiving messages
     msg_socket = build_socket(self_ip)
@@ -65,23 +66,24 @@ def main():
 
     while 1:
         conn, recv_addr = msg_socket.accept()
-
+        recv_addr = recv_addr[0]
+        print("Established connection with %s" % (recv_addr,))
         msg = recv_msg(conn)
-        print("received message from %s of type %s ", recv_addr, msg.msg_type)
+        print("received message from %s of type %s " %(recv_addr, msg.msg_type))
 
 
         if msg.msg_type == 'LE_QUERY':
-            hadlers.le_query_handler(my_node, recv_addr, msg.content)
+            handlers.le_query_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_ACCEPT':
-            hadlers.le_accept_handler(my_node, recv_addr, msg.content)
+            handlers.le_accept_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_REJECT':
-            hadlers.le_reject_handler(my_node, recv_addr, msg.content)
+            handlers.le_reject_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_TERMINATE':
-            hadlers.le_terminate_handler(my_node, recv_addr, msg.content)
+            handlers.le_terminate_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_TERMINATE_ACK':
-            hadlers.le_terminate_ack_handler(my_node, msg.content)
+            handlers.le_terminate_ack_handler(my_node, msg.content)
         elif msg.msg_type == 'BACKUP_QUERY':
-            hadlers.backup_query_handler(my_node, recv_addr, msg.content)
+            handlers.backup_query_handler(my_node, recv_addr, msg.content)
 
 
         # if my_node.le_elected and start_daemons:
