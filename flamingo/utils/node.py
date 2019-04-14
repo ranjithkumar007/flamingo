@@ -3,7 +3,7 @@ import queue
 class Node:
 	def __init__(self, self_ip, adj_nodes_ips):
 		self.self_ip = self_ip
-		self.le_acks = 0
+		self.le_acks = {self_ip:0}
 		self.le_term_acks = 0
 		self.root_ip = self_ip
 		self.adj_nodes_ips = adj_nodes_ips

@@ -67,10 +67,7 @@ def main():
     while 1:
         conn, recv_addr = msg_socket.accept()
         recv_addr = recv_addr[0]
-        print("Established connection with %s" % (recv_addr,))
         msg = recv_msg(conn)
-        print("received message from %s of type %s " %(recv_addr, msg.msg_type))
-
 
         if msg.msg_type == 'LE_QUERY':
             handlers.le_query_handler(my_node, recv_addr, msg.content)
@@ -79,12 +76,9 @@ def main():
         elif msg.msg_type == 'LE_REJECT':
             handlers.le_reject_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_TERMINATE':
-            handlers.le_terminate_handler(my_node, recv_addr, msg.content)
-        elif msg.msg_type == 'LE_TERMINATE_ACK':
-            handlers.le_terminate_ack_handler(my_node, msg.content)
+            handlers.le_terminate_handler(my_node)
         elif msg.msg_type == 'BACKUP_QUERY':
-            handlers.backup_query_handler(my_node, recv_addr, msg.content)
-
+            handlers.backup_query_handler(my_node)
 
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False

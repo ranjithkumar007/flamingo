@@ -26,7 +26,6 @@ def send_msg(msg, to, sock = None):
 
 	sock.shutdown(socket.SHUT_WR)
 	sock.close()
-	print("sent message to %s of type %s" % (to, msg.msg_type))
 
 def recv_msg(conn):
 	data = conn.recv(network_params.BUFFER_SIZE)

@@ -12,7 +12,7 @@ def backup_elect_handler(my_node):
 	send_msg(msg, to = my_node.backup_ip)
 
 def le_result_handler(my_node):
-	print("le first pass done")
+	print(my_node.self_ip, " is the leader")
 	my_node.le_elected = True
 	msg = Message('LE_TERMINATE')
 	for ip in my_node.children:
@@ -28,7 +28,7 @@ def heartbeat_ack_handler(my_node):
 
 def send_heartbeat(my_node, to):
 	msg = Message('HEARTBEAT', content = [my_node.jobQ, my_node.resources])
-	my_node.last_jobs_sent = msg.content[0].count()
+	my_node.last_jobs_sent = msg.content[0].qsize()
 	send_msg(msg, to)
 
 def sleep_and_ping(to):
@@ -61,12 +61,12 @@ def le_query_handler(my_node, recv_ip, new_root_ip):
 		my_node.root_ip = new_root_ip
 		my_node.par = recv_ip
 		my_node.children = []
-		my_node.le_acks = 0
+		my_node.le_acks[my_node.root_ip] = 0
 
 		msg = Message('LE_QUERY', content = my_node.root_ip)
 		for ip in my_node.adj_nodes_ips:
-			# if ip != recv_ip:
-			send_msg(msg, to = ip)
+			if ip != recv_ip:
+				send_msg(msg, to = ip)
 
 		if len(my_node.adj_nodes_ips) == 1:
 			msg = Message('LE_ACCEPT', content = my_node.root_ip)
@@ -80,18 +80,18 @@ def le_accept_handler(my_node, recv_ip, new_root_ip, is_accept = True):
 	if my_node.root_ip == new_root_ip:
 		if is_accept:
 			my_node.children.append(recv_ip)
-		
-		my_node.le_acks += 1
-
-		if my_node.le_acks == len(my_node.adj_nodes_ips):
-			if my_node.root_ip == my_node.self_ip:
-				# leader election completed
-				backup_elect_handler(my_node)
-				# propogate that you are the finally elected leader
-				le_result_handler(my_node)
-			else:
-				msg = Message('LE_ACCEPT', content = my_node.root_ip)
-				send_msg(msg, to = my_node.par)
+		my_node.le_acks[my_node.root_ip] += 1
+			
+		if my_node.root_ip == my_node.self_ip and my_node.le_acks[my_node.root_ip] == len(my_node.adj_nodes_ips):
+			# leader election completed
+			backup_elect_handler(my_node)
+			# propogate that you are the finally elected leader
+			le_result_handler(my_node)
+			
+		if my_node.root_ip != my_node.self_ip and my_node.le_acks[my_node.root_ip] == (len(my_node.adj_nodes_ips) - 1):
+			msg = Message('LE_ACCEPT', content = my_node.root_ip)
+			send_msg(msg, to = my_node.par)
 
 def le_reject_handler(my_node, recv_ip, new_root_ip):
+	# pass
 	return le_accept_handler(my_node, recv_ip, new_root_ip, False)
