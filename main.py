@@ -2,17 +2,21 @@ import argparse
 import socket
 import sys
 import os
+import time
+from multiprocessing import Process
+from messages import network_params
 
-from multiprocessing import Process, Manager
+from jobs.manager import Manager
+from .node import Node
+from messages.message import Message
+from messages import handlers
+from jobs.submit_interface import submit_interface
 
-from node import Node
-from ..messages.message import Message
-
-
-def build_socket():
-    msg_socket = socket.socket()
+def build_socket(self_ip):
+    msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
-    msg_socket.bind((' ', network_params.CLIENT_RECV_PORT))
+    # print(socket.gethostname())
+    msg_socket.bind((self_ip, network_params.CLIENT_RECV_PORT))
     msg_socket.listen(network_params.MAX_OUTSTANDING_REQUESTS)
 
     return msg_socket
@@ -21,7 +25,7 @@ def build_socket():
 def initiate_leader_election(my_node):
     msg = Message('LE_QUERY', content = my_node.self_ip)
     for ip in my_node.adj_nodes_ips:
-        send_msg(msg, to = ip)
+        msg.send_msg(to = ip)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -36,53 +40,54 @@ def main():
     
     adj_nodes_ips = None
     with open(adj_nodes_path, 'r') as f:
-        adj_nodes_ips = f.readlines()
+        adj_nodes_ips = f.read().splitlines()
 
 
     my_node = Node(self_ip, adj_nodes_ips)
 
-    newstdin = os.fdopen(sys.stdin.fileno())
+    newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
     manager = Manager()
 
     my_node.yet_to_submit = manager.dict()
-    # my_node.begin_times = manager.dict()
     my_node.jobQ = manager.Queue()
+    # my_node.leaderQ = 
 
-    interface_p = Process(submit_interface, args = (my_node))
+    interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
 
-    # Leader election
-    # initiate_leader_election(my_node)
-
     # start receiving messages
-    # msg_socket = build_socket()
+    msg_socket = build_socket(self_ip)
+
+    # Leader election
+    initiate_leader_election(my_node)
+
     
-    while 0:
+    msg = Message()
+    while 1:
         conn, recv_addr = msg_socket.accept()
 
-        msg = recv_msg(conn)
+        msg.recv_msg(conn)
         
         assert isinstance(msg, Message), "Received object on socket not of type Message."
 
         if msg.msg_type == 'LE_QUERY':
-            message_handlers.le_query_handler(my_node, recv_addr, msg.content)
+            hadlers.le_query_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_ACCEPT':
-            message_handlers.le_accept_handler(my_node, recv_addr, msg.content)
+            hadlers.le_accept_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_REJECT':
-            message_handlers.le_reject_handler(my_node, recv_addr, msg.content)
+            hadlers.le_reject_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_TERMINATE':
-            message_handlers.le_terminate_handler(my_node, recv_addr, msg.content)
+            hadlers.le_terminate_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'LE_TERMINATE_ACK':
-            message_handlers.le_terminate_ack_handler(my_node, msg.content)
+            hadlers.le_terminate_ack_handler(my_node, msg.content)
         elif msg.msg_type == 'BACKUP_QUERY':
-            message_handlers.backup_query_handler(my_node, recv_addr, msg.content)
+            hadlers.backup_query_handler(my_node, recv_addr, msg.content)
 
 
-        if my_node.is_elected and start_daemons:
+        if my_node.le_elected and start_daemons:
             start_daemons = False
 
             if my_node.self_ip == my_node.root_ip: # Leader
-                ()
                 collector_p = Process(target=initiate_collector, args=(my_node.all_ips))
 
 

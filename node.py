@@ -1,5 +1,5 @@
-import multiprocessing as mp
 import queue
+from jobs.jobqueue import JobPQ
 
 class Node:
 	def __init__(self, self_ip, adj_nodes_ips):
@@ -19,6 +19,6 @@ class Node:
 		self.yet_to_submit = {}
 		self.last_jobs_sent = 0
 
-		# self.leader_jobQ = JobQueue()
+		self.leader_jobQ = JobPQ()
 		self.all_resources = {}
 

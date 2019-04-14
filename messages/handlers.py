@@ -1,4 +1,4 @@
-from .message import Message
+from message import Message
 import multiprocessing as mp
 import time
 

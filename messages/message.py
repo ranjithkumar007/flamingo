@@ -1,7 +1,7 @@
 import socket
 import io
 import pickle
-from ..node import network_params
+import network_params
 
 class Message:
 	def __init__(self, msg_type = None, content = None):
