@@ -1,4 +1,4 @@
-from utils import calculate_job_priority
+from .utils import calculate_job_priority
 
 class JobPQ:
 	def __init__(self, manager):

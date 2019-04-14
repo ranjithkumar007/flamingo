@@ -3,7 +3,7 @@ from utils import *
 import  time
 import uuid
 import sys
-from job import Job
+from .job import Job
 
 def generate_id(self_ip):
 	return hash(self_ip + str(uuid.uuid4()))

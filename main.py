@@ -25,7 +25,7 @@ def build_socket(self_ip):
 def initiate_leader_election(my_node):
     msg = Message('LE_QUERY', content = my_node.self_ip)
     for ip in my_node.adj_nodes_ips:
-        msg.send_msg(to = ip)
+        send_msg(msg, to = ip)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -66,9 +66,9 @@ def main():
     while 1:
         conn, recv_addr = msg_socket.accept()
 
-        msg.recv_msg(conn)
-        
-        assert isinstance(msg, Message), "Received object on socket not of type Message."
+        msg = recv_msg(conn)
+        print("received message from %s of type %s ", recv_addr, msg.msg_type)
+
 
         if msg.msg_type == 'LE_QUERY':
             hadlers.le_query_handler(my_node, recv_addr, msg.content)
