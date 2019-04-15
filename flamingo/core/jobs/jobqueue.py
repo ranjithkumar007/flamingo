@@ -4,6 +4,9 @@ class JobPQ:
 	def __init__(self, manager):
 		self.pq = manager.PriorityQueue()
 
+	def empty(self):
+		return self.pq.empty()
+
 	def get(self):
 		if self.pq.empty():
 			return None

@@ -4,22 +4,22 @@ import sys
 import os
 import time
 from multiprocessing import Process
-import messages.params
 
-from messages.matchmaker import matchmaking
-from messages.utils import send_msg, recv_msg
-from jobs.manager import Manager
-from jobs.jobqueue import JobPQ
-from utils.node import Node
-from messages.message import Message
-from messages import handlers
-from jobs.submit_interface import submit_interface
+from core.messages import params as message_params
+from core.matchmaker import matchmaking
+from core.messages.utils import send_msg, recv_msg
+from core.manager import Manager
+from core.jobs.jobqueue import JobPQ
+from core.node import Node
+from core.messages.message import Message
+from core.messages import handlers
+from core.submit_interface import submit_interface
 
 def build_socket(self_ip):
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
-    msg_socket.bind((self_ip, messages.params.CLIENT_RECV_PORT))
-    msg_socket.listen(messages.params.MAX_OUTSTANDING_REQUESTS)
+    msg_socket.bind((self_ip, message_params.CLIENT_RECV_PORT))
+    msg_socket.listen(message_params.MAX_OUTSTANDING_REQUESTS)
 
     return msg_socket
 
@@ -59,8 +59,10 @@ def main():
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
 
-    my_node.matchmaker_pid = Process(target = matchmaking, args = (my_node, ))
-    my_node.matchmaker_pid.start()
+    matchmaker_p = Process(target = matchmaking, args = (my_node, ))
+    matchmaker_p.start()
+
+    my_node.matchmaker_pid = matchmaker_p.pid
 
     # start receiving messages
     msg_socket = build_socket(self_ip)
@@ -87,13 +89,17 @@ def main():
         elif msg.msg_type == 'BACKUP_QUERY':
             handlers.backup_query_handler(my_node)
         elif msg.msg_type == 'EXEC_JOB':
-            handlers.exec_job_handler(my_node)
+            handlers.exec_job_handler(my_node, msg.content)
         elif msg.msg_type == 'QUERY_FILES':
-            handlers.query_files_handler(my_node)
+            handlers.query_files_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'HEARTBEAT':
             handlers.heartbeat_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'FILES_CONTENT':
             handlers.files_content_handler(my_node, msg.content)
+        elif msg.msg_type == 'ARE_YOU_ALIVE':
+            handlers.send_heartbeat(my_node, recv_addr)
+        elif msg.msg_type == 'HEARTBEAT_ACK':
+            handlers.heartbeat_ack_handler(my_node)
 
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False

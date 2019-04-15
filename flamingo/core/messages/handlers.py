@@ -5,6 +5,7 @@ import time
 from .utils import send_file
 import os
 import signal
+from . import params
 
 def exec_job_handler(my_node, job):
 	inp_fp = job.attr['input_path']
@@ -13,22 +14,53 @@ def exec_job_handler(my_node, job):
 	if not os.path.exists(params.EXEC_DIR):
 		os.makedirs(params.EXEC_DIR)
 
-	if not os.path.exists(os.path.join(params.EXEC_DIR, job.job_id)):
-		os.makedirs(os.path.join(params.EXEC_DIR, job.job_id))
+	dirpath = os.path.join(params.EXEC_DIR, job.job_id)
+	if not os.path.exists(dirpath):
+		os.makedirs(dirpath)
+
+	if job.source_ip == my_node.self_ip:
+		os.system("cp " + job.attr['input_path'] + " " + dirpath + "/input")
+		os.system("cp " + job.attr['exec_path'] + " " + dirpath + "/executable")
+		
+		start_job(my_node, job.job_id, job.source_ip, job.)
+		return
 
 	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
 	send_msg(msg, to = job.source_ip)
 
 def query_files_handler(my_node, recv_ip, content):
 	job_id = content[0]
-	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "input")
-	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "executable")
+	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "input")
+	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "executable")
+
+def exec_new_job(job_id, cmd):
+	os.chdir(os.path.join(params.EXEC_DIR, job_id))
+	os.system(cmd)
+
+	# send leader msg to remove this job from running Q
+
+
+def start_job(my_node, job_id):
+	print("Starting job")
+	cmd = "./executable < input > out_file" 
+
+	my_node.job_pids[job_id] = Process(target = exec_new_job, args = (job_id, cmd))
+	my_node.job_pids[job_id].start()
 	
 def files_content_handler(my_node, content):
 	job_id, file_ty, file_content = content
 
-	with open(os.path.join(os.path.join(params.EXEC_DIR, job.job_id), file_ty), 'wb') as fp:
+	dirpath = os.path.join(params.EXEC_DIR, job_id)
+	file_path = os.path.join(dirpath, file_ty)
+
+	with open(file_path, 'wb') as fp:
 		fp.write(file_content)
+
+	if file_ty == "executable":
+		os.chmod(file_path, 0744)
+
+	if os.path.exists(os.path.join(dirpath, "executable")) and os.path.exists(os.path.join(dirpath, "input"))
+		start_job(my_node, job_id)
 
 def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
@@ -47,9 +79,8 @@ def le_result_handler(my_node):
 
 def heartbeat_ack_handler(my_node):
 	for i in range(my_node.last_jobs_sent):
-		temp = my_node.jobQ[0]
-		my_node.jobQ.remove(temp)
-		rid = temp.job_id
+		rid = my_node.jobQ[0].job_id
+		del my_node.jobQ[0]
 		del my_node.yet_to_submit[rid]
 
 	my_node.last_jobs_sent = 0
@@ -57,7 +88,7 @@ def heartbeat_ack_handler(my_node):
 def send_heartbeat(my_node, to):
 	cur_res = get_resources()
 	my_node.resources[my_node.self_ip] = cur_res
-	
+
 	jobQ_cp = []
 	for job_i in my_node.jobQ:
 		jobQ_cp.append(job_i)
@@ -66,7 +97,7 @@ def send_heartbeat(my_node, to):
 	print(msg.content[0])
 	print(msg.content[1])
 	
-	my_node.last_jobs_sent = msg.content[0].qsize()
+	my_node.last_jobs_sent = len(msg.content[0])
 	send_msg(msg, to)
 
 def sleep_and_ping(to):
@@ -89,7 +120,7 @@ def heartbeat_handler(my_node, recv_ip, content):
 	msg = Message('HEARTBEAT_ACK')
 	send_msg(msg, to = recv_ip)
 
-	knocker_p = mp.Process(target = sleep_and_ping, args = (recv_ip))
+	knocker_p = mp.Process(target = sleep_and_ping, args = (recv_ip, ))
 	knocker_p.start()
 	
 def le_terminate_handler(my_node):

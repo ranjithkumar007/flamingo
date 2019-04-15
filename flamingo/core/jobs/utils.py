@@ -1,5 +1,9 @@
 import time
 from . import params
+import uuid
+
+def generate_id(self_ip):
+	return str(hash(self_ip + str(uuid.uuid4())))
 
 def parse_job_file(filepath):
 	with open(filepath, 'r') as fp:
@@ -8,7 +12,10 @@ def parse_job_file(filepath):
 
 		for line in lines:
 			attr, val = line.split(' ')
-			specs[attr] = val
+			try:
+				specs[attr] = int(val)
+			except:
+				specs[attr] = val
 
 		return specs
 

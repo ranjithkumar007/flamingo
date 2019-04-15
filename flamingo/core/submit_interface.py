@@ -1,18 +1,13 @@
 import argparse
-from utils import *
 import  time
-import uuid
 import sys
-from .job import Job
-from .utils import parse_job_file
-
-def generate_id(self_ip):
-	return hash(self_ip + str(uuid.uuid4()))
+from jobs.job import Job
+from jobs.utils import parse_job_file, generate_id
 
 def submit_interface(my_node, newstdin):
 	sys.stdin = newstdin
 	while True:
-		client_id = input('\n>>Enter your user id\n')
+		client_id = int(input('\n>>Enter your user id\n'))
 		# add authentication
 
 		while True:
@@ -36,7 +31,7 @@ def submit_interface(my_node, newstdin):
 				job_ob.submitted_time =  time.time()
 
 				job_ob.job_id = generate_id(my_node.self_ip)
-				my_node.jobQ.put(job_ob)
+				my_node.jobQ.append(job_ob)
 				my_node.yet_to_submit[job_ob.job_id] = 1
 			else :
 				pass
