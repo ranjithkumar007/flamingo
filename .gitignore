@@ -2,3 +2,4 @@ __pychache__/
 *.pyc
 test.py
 my_jobs/
+test/

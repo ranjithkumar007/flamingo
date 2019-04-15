@@ -1,7 +1,7 @@
 import signal
 import sys
-from messages.message import Message
-from messages.utils import send_msg
+from .messages.message import Message
+from .messages.utils import send_msg, get_resources
 
 def signal_handler(sig, frame):
 	if sig == signal.SIGUSR1:
@@ -22,6 +22,7 @@ def match(job, resources, running_jobs):
 	return assigned_ip, preempt_job_id
 
 def matchmaking(my_node):
+	my_node.resources[my_node.self_ip] = get_resources()
 	signal.signal(signal.SIGUSR1, signal_handler)
 
 	while True:

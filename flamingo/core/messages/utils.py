@@ -50,7 +50,12 @@ def send_msg(msg, to, sock = None, close_sock = True):
 def send_file(filepath, to, job_id, file_ty):
 	sock = create_socket(to)
 
-	msg = Message('FILES_CONTENT')
+	if file_ty == 'log':
+		msg_ty = 'LOG_FILE'
+	else:
+		msg_ty = 'FILES_CONTENT'
+
+	msg = Message(msg_ty)
 	msg.content = [job_id, file_ty]
 
 	data_list = []

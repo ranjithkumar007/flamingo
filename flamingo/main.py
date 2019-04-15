@@ -29,15 +29,20 @@ def initiate_leader_election(my_node):
     for ip in my_node.adj_nodes_ips:
         send_msg(msg, to = ip)
 
+def get_my_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
+
 def main():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("--self_ip", help = "Ip of this node", required = True, type = str)
     parser.add_argument("--adj_nodes_path", help = "Path to a list of ips of adjacent nodes", required = True, type = str)
     
     args = vars(parser.parse_args())
 
-    self_ip = args['self_ip']
+    self_ip = get_my_ip()
     adj_nodes_path = args['adj_nodes_path']
     
     adj_nodes_ips = None
@@ -53,16 +58,18 @@ def main():
     my_node.yet_to_submit = manager.dict()
     my_node.jobQ = manager.list()
     my_node.resources = manager.dict()
-    my_node.running_jobs = manager.dict()
-    my_node.leader_jobPQ = JobPQ(manager)
 
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
 
-    matchmaker_p = Process(target = matchmaking, args = (my_node, ))
-    matchmaker_p.start()
+    if my_node.self_ip == my_node.root_ip:
+        my_node.running_jobs = manager.dict()
+        my_node.leader_jobPQ = JobPQ(manager)
 
-    my_node.matchmaker_pid = matchmaker_p.pid
+        matchmaker_p = Process(target = matchmaking, args = (my_node, ))
+        matchmaker_p.start()
+
+        my_node.matchmaker_pid = matchmaker_p.pid
 
     # start receiving messages
     msg_socket = build_socket(self_ip)
@@ -100,6 +107,14 @@ def main():
             handlers.send_heartbeat(my_node, recv_addr)
         elif msg.msg_type == 'HEARTBEAT_ACK':
             handlers.heartbeat_ack_handler(my_node)
+        elif msg.msg_type == 'LOG_FILE':
+            handlers.log_file_handler(my_node, msg.content)
+        elif msg.msg_type == 'LOG_FILE_ACK':
+            handlers.log_file_ack_handler(my_node, recv_addr)
+        elif msg.msg_type == 'COMPLETED_JOB':
+            handlers.completed_job_handler(my_node, recv_addr, content)
+
+
 
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False

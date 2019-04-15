@@ -19,7 +19,9 @@ class Node:
 		self.last_jobs_sent = 0
 
 		self.running_jobs = None
-
+		self.completed_jobs = {}
 		self.leader_jobPQ = None
 		self.matchmaker_pid = None
+		self.job_pid = {}
 
+		self.job_submitted_time = {}

@@ -1,8 +1,8 @@
 import argparse
 import  time
 import sys
-from jobs.job import Job
-from jobs.utils import parse_job_file, generate_id
+from .jobs.job import Job
+from .jobs.utils import parse_job_file, generate_id
 
 def submit_interface(my_node, newstdin):
 	sys.stdin = newstdin
@@ -28,10 +28,14 @@ def submit_interface(my_node, newstdin):
 				job_ob.attr = parse_job_file(jd)
 				job_ob.client_id = client_id
 				job_ob.source_ip = my_node.self_ip
-				job_ob.submitted_time =  time.time()
+				# job_ob.submitted_time =  time.time()
 
 				job_ob.job_id = generate_id(my_node.self_ip)
-				my_node.jobQ.append(job_ob)
-				my_node.yet_to_submit[job_ob.job_id] = 1
+				
+				if my_node.self_ip == my_node.root_ip:
+					my_node.leader_jobPQ.put(job_ob)
+				else:
+					my_node.jobQ.append(job_ob)
+					my_node.yet_to_submit[job_ob.job_id] = 1
 			else :
 				pass

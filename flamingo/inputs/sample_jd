@@ -3,6 +3,4 @@ max_memory 4
 cores 2
 exec_path inputs/a.out
 input_path inputs/inp
-output_path inputs/out
-error_path None
 priority 2

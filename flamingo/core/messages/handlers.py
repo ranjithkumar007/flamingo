@@ -1,18 +1,31 @@
 from .message import Message
 from .utils import send_msg, get_resources
-import multiprocessing as mp
+from multiprocessing import Process
 import time
 from .utils import send_file
 import os
 import signal
 from . import params
 
+def start_job(my_node, job_id):
+	print("Starting job")
+	cmd = "./executable < input > " +  params.LOG_DIR + "/" + job_id 
+
+	exec_p = Process(target = exec_new_job, args = (job_id, cmd, my_node.root_ip))
+	exec_p.start()
+	my_node.job_pid[job_id] = exec_p.pid
+
 def exec_job_handler(my_node, job):
 	inp_fp = job.attr['input_path']
 	exec_fp = job.attr['exec_path']
 
+	my_node.job_submitted_time[job.job_id] = job.submitted_time
+
 	if not os.path.exists(params.EXEC_DIR):
 		os.makedirs(params.EXEC_DIR)
+
+	if not os.path.exists(params.LOG_DIR):
+		os.makedirs(params.LOG_DIR)
 
 	dirpath = os.path.join(params.EXEC_DIR, job.job_id)
 	if not os.path.exists(dirpath):
@@ -22,7 +35,7 @@ def exec_job_handler(my_node, job):
 		os.system("cp " + job.attr['input_path'] + " " + dirpath + "/input")
 		os.system("cp " + job.attr['exec_path'] + " " + dirpath + "/executable")
 		
-		start_job(my_node, job.job_id, job.source_ip, job.)
+		start_job(my_node, job.job_id)
 		return
 
 	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
@@ -33,20 +46,54 @@ def query_files_handler(my_node, recv_ip, content):
 	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "input")
 	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "executable")
 
-def exec_new_job(job_id, cmd):
+def exec_new_job(job_id, cmd, root_ip):
 	os.chdir(os.path.join(params.EXEC_DIR, job_id))
+	st_tm = time.time()
 	os.system(cmd)
+	end_tm = time.time()
 
+	job_run_time = end_tm - st_tm
+	tat = end_tm - my_node.job_submitted_time[job_id]
+
+	print("Completed job")
+
+	msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
+	send_msg(msg, to = root_ip)
+
+	del my_node.job_pid[job_id]
+	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
+	
+	send_file(os.path.join(params.LOG_DIR, job_id), to = recv_ip, job_id = job_id, file_ty = "log")	
 	# send leader msg to remove this job from running Q
 
+def log_file_handler(my_node, content):
+	job_id, file_ty, file_content = content
 
-def start_job(my_node, job_id):
-	print("Starting job")
-	cmd = "./executable < input > out_file" 
+	log_path = os.path.join(params.LOG_DIR, job_id)
+	with open(log_path, 'wb') as fp:
+		fp.write(file_content)
 
-	my_node.job_pids[job_id] = Process(target = exec_new_job, args = (job_id, cmd))
-	my_node.job_pids[job_id].start()
+	msg = Message('LOG_FILE_ACK')	
+	send_msg(msg, to = my_node.root_ip)
+
+def completed_job_handler(my_node, recv_ip, content):
+	job_id, job_run_time, completion_time, tat = content
+
+	del my_node.running_jobs[job_id]
 	
+	if not job_id in my_node.completed_jobs:
+		my_node.completed_jobs[job_id] = {}
+	
+	my_node.completed_jobs[job_id]['turn_around_time'] = tat
+	my_node.completed_jobs[job_id]['job_run_time'] = job_run_time
+	my_node.completed_jobs[job_id]['log_file_ip1'] = recv_ip
+
+def log_file_ack_handler(my_node, recv_ip):
+	if not job_id in my_node.completed_jobs:
+		my_node.completed_jobs[job_id] = {}
+	
+	my_node.completed_jobs[job_id]['log_file_ip2'] = recv_ip
+
 def files_content_handler(my_node, content):
 	job_id, file_ty, file_content = content
 
@@ -57,9 +104,10 @@ def files_content_handler(my_node, content):
 		fp.write(file_content)
 
 	if file_ty == "executable":
-		os.chmod(file_path, 0744)
+		os.system("chmod +x " + file_path)
 
-	if os.path.exists(os.path.join(dirpath, "executable")) and os.path.exists(os.path.join(dirpath, "input"))
+	if os.path.exists(os.path.join(dirpath, "executable")) \
+		and os.path.exists(os.path.join(dirpath, "input")):
 		start_job(my_node, job_id)
 
 def backup_query_handler(my_node):
