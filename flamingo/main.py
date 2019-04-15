@@ -97,7 +97,7 @@ def main():
         elif msg.msg_type == 'QUERY_FILES':
             handlers.query_files_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'HEARTBEAT':
-            handlers.heartbeat_handler(my_node, recv_addr, msg.content)
+            handlers.heartbeat_handler(my_node, recv_addr, msg.content, manager)
         elif msg.msg_type == 'FILES_CONTENT':
             handlers.files_content_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'ARE_YOU_ALIVE':
@@ -121,6 +121,9 @@ def main():
 
 
         if my_node.le_elected and my_node.self_ip == my_node.root_ip and not matchmaker_started:    
+            
+            my_node.running_jobs = manager.dict()
+            my_node.leader_jobPQ = JobPQ(manager)
             matchmaker_p = Process(target = matchmaking, args = (my_node, ))
             matchmaker_p.start()
 
@@ -129,8 +132,7 @@ def main():
             my_node.matchmaker_pid = matchmaker_p.pid
             matchmaker_started = True
 
-            my_node.running_jobs = manager.dict()
-            my_node.leader_jobPQ = JobPQ(manager)
+            
 
 
         # if my_node.le_elected and start_daemons:

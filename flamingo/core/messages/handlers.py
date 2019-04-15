@@ -34,6 +34,8 @@ def exec_job_handler(my_node, job):
 	if not os.path.exists(dirpath):
 		os.makedirs(dirpath)
 
+	my_node.individual_running_jobs[job.job_id] = job
+
 	if job.source_ip == my_node.self_ip:
 		os.system("cp " + job.attr['input_path'] + " " + dirpath + "/input")
 		os.system("cp " + job.attr['exec_path'] + " " + dirpath + "/executable")
@@ -41,7 +43,7 @@ def exec_job_handler(my_node, job):
 		start_job(my_node, job.job_id, job.source_ip)
 		return
 	# storing job in indiviudual_running_jobs
-	my_node.individual_running_jobs[job.job_id] = job
+	
 
 	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
 	send_msg(msg, to = job.source_ip)
@@ -89,11 +91,17 @@ def log_file_handler(my_node, content):
 	send_msg(msg, to = my_node.root_ip)
 
 def completed_job_handler(my_node, recv_ip, content):
+	# print(my_node.completed_jobs)
+	# print(my_node.running_jobs)
 	job_id, job_run_time, tat = content
+	# print(my_node.running_jobs)
+	j = None
+	for i in range(len(my_node.running_jobs[recv_ip])):
+		if my_node.running_jobs[recv_ip][i].job_id == job_id:
+			j = i
 
-	for job in my_node.running_jobs[recv_ip]:
-		if job.job_id == job_id:
-			my_node.running_jobs[recv_ip].remove(job)
+	if j:
+		my_node.running_jobs[recv_ip] = my_node.running_jobs[recv_ip][:j] + my_node.running_jobs[recv_ip][j+1:]
 	
 	if not job_id in my_node.completed_jobs:
 		my_node.completed_jobs[job_id] = {}
@@ -101,6 +109,8 @@ def completed_job_handler(my_node, recv_ip, content):
 	my_node.completed_jobs[job_id]['turn_around_time'] = tat
 	my_node.completed_jobs[job_id]['job_run_time'] = job_run_time
 	my_node.completed_jobs[job_id]['log_file_ip1'] = recv_ip
+	# print(my_node.completed_jobs)
+	# print(my_node.running_jobs)
 
 def preempt_and_exec_handler(my_node, to, content):
 	preempt_pid = my_node.job_pid[content[1]]
@@ -124,9 +134,12 @@ def status_job_handler(my_node, recv_addr, content):
 	if jobid in my_node.completed_jobs.keys():
 		reply = "Completed"
 	
+	# print(my_node.running_jobs)
 	for key in my_node.running_jobs.keys():
-		if jobid in my_node.running_jobs[key]:
-			reply = "Running"
+		for job in my_node.running_jobs[key]:
+			if jobid == job.job_id:
+				reply = "Running"
+				break
 
 	msg = Message('STATUS_REPLY',content = [jobid, reply])
 	send_msg(msg, to = recv_addr)
@@ -174,6 +187,7 @@ def backup_elect_handler(my_node):
 def le_result_handler(my_node):
 	print(my_node.self_ip, " is the leader")
 	my_node.le_elected = True
+	my_node.root_ip_dict['ip'] = my_node.self_ip
 
 	msg = Message('LE_TERMINATE')
 	for ip in my_node.children:
@@ -210,7 +224,7 @@ def sleep_and_ping(to):
 	send_msg(msg, to)
 
 # both task and resource manager combined
-def heartbeat_handler(my_node, recv_ip, content):
+def heartbeat_handler(my_node, recv_ip, content, manager):
 	# call matchmaker
 	node_jobQ, node_res = content
 	my_node.resources[recv_ip] = node_res
@@ -218,7 +232,12 @@ def heartbeat_handler(my_node, recv_ip, content):
 	for job_i in node_jobQ:
 		my_node.leader_jobPQ.put(job_i)
 
+	if not recv_ip in my_node.running_jobs.keys():
+		my_node.running_jobs[recv_ip] = manager.list()
+
 	# wake up matchmaker
+	os.system("pgrep -P " + str(os.getpid()))
+	print(my_node.matchmaker_pid)
 	os.kill(my_node.matchmaker_pid, signal.SIGUSR1)
 
 	msg = Message('HEARTBEAT_ACK')

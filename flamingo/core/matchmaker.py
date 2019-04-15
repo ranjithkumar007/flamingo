@@ -24,7 +24,6 @@ def match(job, resources, running_jobs):
 def matchmaking(my_node):
 	my_node.resources[my_node.self_ip] = get_resources()
 	signal.signal(signal.SIGUSR1, signal_handler)
-	my_node.resources[my_node.self_ip] = get_resources()
 
 	while True:
 		signal.pause()
@@ -39,10 +38,8 @@ def matchmaking(my_node):
 				msg = Message('EXEC_JOB',content=job)
 				send_msg(msg,to = assigned_ip)
 
-				if not assigned_ip in my_node.running_jobs.keys():
-					my_node.running_jobs[assigned_ip] = []
-
-				my_node.running_jobs[assigned_ip].append(job)
+				my_node.running_jobs[assigned_ip] = my_node.running_jobs[assigned_ip] + [job]
+				# print(my_node.running_jobs)
 
 			if assigned_ip and preempt_job_id:	
 				msg = Message('PREEMPT_AND_EXEC',content=[job, preempt_job_id])
