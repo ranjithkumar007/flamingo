@@ -1,7 +1,7 @@
 import signal
 import sys
-from messages.message import Message
-from messages.utils import send_msg
+from .messages.message import Message
+from .messages.utils import send_msg,get_resources
 
 def signal_handler(sig, frame):
 	if sig == signal.SIGUSR1:
@@ -23,6 +23,7 @@ def match(job, resources, running_jobs):
 
 def matchmaking(my_node):
 	signal.signal(signal.SIGUSR1, signal_handler)
+	my_node.resources[my_node.self_ip] = get_resources()
 
 	while True:
 		signal.pause()
@@ -36,9 +37,11 @@ def matchmaking(my_node):
 			if assigned_ip and not preempt_job_id:
 				msg = Message('EXEC_JOB',content=job)
 				send_msg(msg,to = assigned_ip)
+				my_node.running_jobs[assigned_ip].append(job)
 			if assigned_ip and preempt_job_id:	
 				msg = Message('PREEMPT_AND_EXEC',content=[job, preempt_job_id])
 				send_msg(msg,to = assigned_ip)
+				my_node.running_jobs[assigned_ip].append(job)
 			if not assigned_ip and not preempt_job_id:
 				poor_jobs.append(job)
 

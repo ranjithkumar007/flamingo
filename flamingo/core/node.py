@@ -22,4 +22,8 @@ class Node:
 
 		self.leader_jobPQ = None
 		self.matchmaker_pid = None
+		self.submit_interface_pid = None
+		self.job_pids = {}
+
+		self.individual_running_jobs = {}
 

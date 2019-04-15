@@ -6,6 +6,7 @@ from .utils import send_file
 import os
 import signal
 from . import params
+from multiprocessing import Process
 
 def exec_job_handler(my_node, job):
 	inp_fp = job.attr['input_path']
@@ -22,8 +23,10 @@ def exec_job_handler(my_node, job):
 		os.system("cp " + job.attr['input_path'] + " " + dirpath + "/input")
 		os.system("cp " + job.attr['exec_path'] + " " + dirpath + "/executable")
 		
-		start_job(my_node, job.job_id, job.source_ip, job.)
+		start_job(my_node, job.job_id)
 		return
+	# storing job in indiviudual_running_jobs
+	my_node.indiviudual_running_jobs[job.job_id] = job
 
 	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
 	send_msg(msg, to = job.source_ip)
@@ -33,10 +36,12 @@ def query_files_handler(my_node, recv_ip, content):
 	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "input")
 	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "executable")
 
-def exec_new_job(job_id, cmd):
+def exec_new_job(my_node, job_id, cmd):
 	os.chdir(os.path.join(params.EXEC_DIR, job_id))
 	os.system(cmd)
 
+	# After running got completed remove this job from individual_running_jobs
+	del my_node.individual_running_jobs[job_id]
 	# send leader msg to remove this job from running Q
 
 
@@ -44,8 +49,46 @@ def start_job(my_node, job_id):
 	print("Starting job")
 	cmd = "./executable < input > out_file" 
 
-	my_node.job_pids[job_id] = Process(target = exec_new_job, args = (job_id, cmd))
-	my_node.job_pids[job_id].start()
+	exec_p = Process(target = exec_new_job, args = (my_node, job_id, cmd))
+	exec_p.start()
+	my_node.job_pids[job_id] = exec_p.pid
+
+def preempt_and_exec_handler(my_node, to, content):
+	preempt_pid = my_node.job_pids[content[1]]
+
+	os.kill(preempt_pid, signal.SIGKILL)
+	print("Preempted this job with id : %s in node %s" % (content[1],my_node.self_ip))
+	msg = Message('PREEMPTED_JOB',content = [my_node.individual_running_jobs[content[1]]])
+	send_msg(msg, to = to)
+	del my_node.individual_running_jobs[content[1]]
+	exec_job_handler(my_node, content[0])
+
+
+def preempted_job_handler(my_node, recv_addr, content):
+	my_node.running_jobs[recv_addr].remove(content[0])
+
+
+def status_job_handler(my_node, recv_addr, content):
+	jobid = content[0]
+	reply = "Waiting"
+	if jobid in my_node.completed_jobs:
+		reply = "Completed"
+	
+	for key in my_node.running_jobs.keys():
+		if jobid in my_node.running_jobs[key]:
+			reply = "Running"
+
+	msg = Message('STATUS_REPLY',content = [jobid, reply])
+	send_msg(msg, to = recv_addr)
+
+def print_status_reply(my_node, content):
+	jobid = content[0]
+	reply = content[1]
+	print("Status of job with jobid %s is %s" % (jobid,reply))
+
+	# woke the submit_interface process
+	os.kill(my_node.submit_interface_pid, signal.SIGUSR1)
+
 	
 def files_content_handler(my_node, content):
 	job_id, file_ty, file_content = content
@@ -57,9 +100,9 @@ def files_content_handler(my_node, content):
 		fp.write(file_content)
 
 	if file_ty == "executable":
-		os.chmod(file_path, 0744)
+		os.system("chmod +x "+file_path)
 
-	if os.path.exists(os.path.join(dirpath, "executable")) and os.path.exists(os.path.join(dirpath, "input"))
+	if os.path.exists(os.path.join(dirpath, "executable")) and os.path.exists(os.path.join(dirpath, "input")):
 		start_job(my_node, job_id)
 
 def backup_query_handler(my_node):
