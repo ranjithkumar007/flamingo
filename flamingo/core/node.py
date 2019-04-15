@@ -18,6 +18,8 @@ class Node:
 		self.yet_to_submit = None
 		self.last_jobs_sent = 0
 
+		self.root_ip_dict = None
+
 		self.running_jobs = None
 		self.completed_jobs = {}
 		self.leader_jobPQ = None

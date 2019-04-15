@@ -43,11 +43,8 @@ def submit_interface(my_node, newstdin):
 
 				print("JobID of the job you just submitted is %s" % (job_ob.job_id, ))
 
-				if my_node.self_ip == my_node.root_ip:
-					my_node.leader_jobPQ.put(job_ob)
-				else:
-					my_node.jobQ.append(job_ob)
-					my_node.yet_to_submit[job_ob.job_id] = 1
+				my_node.jobQ.append(job_ob)
+				my_node.yet_to_submit[job_ob.job_id] = 1
 			
 			elif command == "status":
 				if len(slots) == 1:
@@ -56,7 +53,7 @@ def submit_interface(my_node, newstdin):
 
 				jobid = slots[1]
 				msg = Message('STATUS_JOB',content = [jobid])
-				send_msg(msg, to = my_node.root_ip)
+				send_msg(msg, to = my_node.root_ip_dict['ip'])
 				# Pause this process until response from leader arrives
 				signal.pause()
 					

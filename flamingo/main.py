@@ -3,7 +3,8 @@ import socket
 import sys
 import os
 import time
-from multiprocessing import Process
+from multiprocessing import Process, Value
+from ctypes import c_bool
 
 from core.messages import params as message_params
 from core.matchmaker import matchmaking
@@ -58,6 +59,9 @@ def main():
     my_node.yet_to_submit = manager.dict()
     my_node.jobQ = manager.list()
     my_node.resources = manager.dict()
+    my_node.job_pid = manager.dict()
+
+    my_node.root_ip_dict = manager.dict()
 
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
@@ -95,7 +99,7 @@ def main():
         elif msg.msg_type == 'HEARTBEAT':
             handlers.heartbeat_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'FILES_CONTENT':
-            handlers.files_content_handler(my_node, msg.content)
+            handlers.files_content_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'ARE_YOU_ALIVE':
             handlers.send_heartbeat(my_node, recv_addr)
         elif msg.msg_type == 'HEARTBEAT_ACK':

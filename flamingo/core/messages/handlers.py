@@ -9,11 +9,14 @@ from multiprocessing import Process
 
 def start_job(my_node, job_id, recv_ip):
 	print("Starting job")
-	cmd = "./executable < input > " +  "../" + params.LOG_DIR + "/" + job_id 
+	cmd = "./executable < input > " +  "../../" + params.LOG_DIR + "/" + job_id 
+	print(cmd)
 
 	exec_p = Process(target = exec_new_job, args = (my_node, job_id, cmd, recv_ip))
 	exec_p.start()
 	my_node.job_pid[job_id] = exec_p.pid
+	print("job pid added")
+	print(my_node.job_pid)
 
 def exec_job_handler(my_node, job):
 	inp_fp = job.attr['input_path']
@@ -61,13 +64,15 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 	msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
 	send_msg(msg, to = my_node.root_ip)
 
+	print(my_node.job_pid)
 	del my_node.job_pid[job_id]
 	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
 	
 	log_ip = source_ip
 	if source_ip == my_node.self_ip:
 		log_ip = my_node.adj_nodes_ips[0]
-	send_file(os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
+
+	send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
 
 	# After running got completed remove this job from individual_running_jobs
 	del my_node.individual_running_jobs[job_id]
@@ -84,9 +89,11 @@ def log_file_handler(my_node, content):
 	send_msg(msg, to = my_node.root_ip)
 
 def completed_job_handler(my_node, recv_ip, content):
-	job_id, job_run_time, completion_time, tat = content
+	job_id, job_run_time, tat = content
 
-	del my_node.running_jobs[job_id]
+	for job in my_node.running_jobs[recv_ip]:
+		if job.job_id == job_id:
+			my_node.running_jobs[recv_ip].remove(job)
 	
 	if not job_id in my_node.completed_jobs:
 		my_node.completed_jobs[job_id] = {}
@@ -172,6 +179,8 @@ def le_result_handler(my_node):
 	for ip in my_node.children:
 		send_msg(msg, to = ip)
 
+	send_heartbeat(my_node, to = my_node.self_ip)
+
 def heartbeat_ack_handler(my_node):
 	for i in range(my_node.last_jobs_sent):
 		rid = my_node.jobQ[0].job_id
@@ -221,6 +230,8 @@ def heartbeat_handler(my_node, recv_ip, content):
 def le_terminate_handler(my_node):
 	msg = Message('LE_TERMINATE')
 	my_node.le_elected = True
+	my_node.root_ip_dict['ip'] = my_node.root_ip
+
 	for ip in my_node.children:
 		send_msg(msg, to = ip)
 
