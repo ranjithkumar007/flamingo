@@ -63,15 +63,6 @@ def main():
     interface_p.start()
     my_node.submit_interface_pid = interface_p.pid
 
-    if my_node.self_ip == my_node.root_ip:
-        my_node.running_jobs = manager.dict()
-        my_node.leader_jobPQ = JobPQ(manager)
-
-        matchmaker_p = Process(target = matchmaking, args = (my_node, ))
-        matchmaker_p.start()
-        my_node.matchmaker_pid = matchmaker_p.pid
-
-
     # start receiving messages
     msg_socket = build_socket(self_ip)
 
@@ -79,6 +70,7 @@ def main():
     initiate_leader_election(my_node)
     
     msg = Message()
+    matchmaker_started = False
 
     while 1:
         conn, recv_addr = msg_socket.accept()
@@ -111,9 +103,9 @@ def main():
         elif msg.msg_type == 'LOG_FILE':
             handlers.log_file_handler(my_node, msg.content)
         elif msg.msg_type == 'LOG_FILE_ACK':
-            handlers.log_file_ack_handler(my_node, recv_addr)
+            handlers.log_file_ack_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'COMPLETED_JOB':
-            handlers.completed_job_handler(my_node, recv_addr, content)
+            handlers.completed_job_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'PREEMPT_AND_EXEC':
             handlers.preempt_and_exec_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'PREEMPTED_JOB':
@@ -122,6 +114,20 @@ def main():
             handlers.status_job_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'STATUS_REPLY':
             handlers.print_status_reply(my_node, msg.content)
+
+
+        if my_node.le_elected and my_node.self_ip == my_node.root_ip and not matchmaker_started:    
+            matchmaker_p = Process(target = matchmaking, args = (my_node, ))
+            matchmaker_p.start()
+
+            print("Starting Matchmaker")
+
+            my_node.matchmaker_pid = matchmaker_p.pid
+            matchmaker_started = True
+
+            my_node.running_jobs = manager.dict()
+            my_node.leader_jobPQ = JobPQ(manager)
+
 
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False

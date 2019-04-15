@@ -1,6 +1,5 @@
 from .message import Message
 from .utils import send_msg, get_resources
-from multiprocessing import Process
 import time
 from .utils import send_file
 import os
@@ -8,11 +7,11 @@ import signal
 from . import params
 from multiprocessing import Process
 
-def start_job(my_node, job_id):
+def start_job(my_node, job_id, recv_ip):
 	print("Starting job")
-	cmd = "./executable < input > " +  params.LOG_DIR + "/" + job_id 
+	cmd = "./executable < input > " +  "../" + params.LOG_DIR + "/" + job_id 
 
-	exec_p = Process(target = exec_new_job, args = (job_id, cmd, my_node.root_ip))
+	exec_p = Process(target = exec_new_job, args = (my_node, job_id, cmd, recv_ip))
 	exec_p.start()
 	my_node.job_pid[job_id] = exec_p.pid
 
@@ -36,10 +35,10 @@ def exec_job_handler(my_node, job):
 		os.system("cp " + job.attr['input_path'] + " " + dirpath + "/input")
 		os.system("cp " + job.attr['exec_path'] + " " + dirpath + "/executable")
 		
-		start_job(my_node, job.job_id)
+		start_job(my_node, job.job_id, job.source_ip)
 		return
 	# storing job in indiviudual_running_jobs
-	my_node.indiviudual_running_jobs[job.job_id] = job
+	my_node.individual_running_jobs[job.job_id] = job
 
 	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
 	send_msg(msg, to = job.source_ip)
@@ -49,7 +48,7 @@ def query_files_handler(my_node, recv_ip, content):
 	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "input")
 	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "executable")
 
-def exec_new_job(my_node, job_id, cmd):
+def exec_new_job(my_node, job_id, cmd, source_ip):
 	os.chdir(os.path.join(params.EXEC_DIR, job_id))
 	st_tm = time.time()
 	os.system(cmd)
@@ -60,13 +59,13 @@ def exec_new_job(my_node, job_id, cmd):
 
 	print("Completed job")
 	msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
-	send_msg(msg, to = root_ip)
+	send_msg(msg, to = my_node.root_ip)
 
 	del my_node.job_pid[job_id]
 	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
 	
-	log_ip = recv_ip
-	if recv_ip == my_node.self_ip:
+	log_ip = source_ip
+	if source_ip == my_node.self_ip:
 		log_ip = my_node.adj_nodes_ips[0]
 	send_file(os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
 
@@ -81,7 +80,7 @@ def log_file_handler(my_node, content):
 	with open(log_path, 'wb') as fp:
 		fp.write(file_content)
 
-	msg = Message('LOG_FILE_ACK')	
+	msg = Message('LOG_FILE_ACK', content = job_id)	
 	send_msg(msg, to = my_node.root_ip)
 
 def completed_job_handler(my_node, recv_ip, content):
@@ -134,13 +133,14 @@ def print_status_reply(my_node, content):
 	os.kill(my_node.submit_interface_pid, signal.SIGUSR1)
 	
 
-def log_file_ack_handler(my_node, recv_ip):
+def log_file_ack_handler(my_node, recv_ip, content):
+	job_id = content
 	if not job_id in my_node.completed_jobs:
 		my_node.completed_jobs[job_id] = {}
 	
 	my_node.completed_jobs[job_id]['log_file_ip2'] = recv_ip
 
-def files_content_handler(my_node, content):
+def files_content_handler(my_node, recv_ip, content):
 	job_id, file_ty, file_content = content
 
 	dirpath = os.path.join(params.EXEC_DIR, job_id)
@@ -154,7 +154,7 @@ def files_content_handler(my_node, content):
 
 	if os.path.exists(os.path.join(dirpath, "executable")) \
 		and os.path.exists(os.path.join(dirpath, "input")):
-		start_job(my_node, job_id)
+		start_job(my_node, job_id, recv_ip)
 
 def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
@@ -167,6 +167,7 @@ def backup_elect_handler(my_node):
 def le_result_handler(my_node):
 	print(my_node.self_ip, " is the leader")
 	my_node.le_elected = True
+
 	msg = Message('LE_TERMINATE')
 	for ip in my_node.children:
 		send_msg(msg, to = ip)
@@ -214,7 +215,7 @@ def heartbeat_handler(my_node, recv_ip, content):
 	msg = Message('HEARTBEAT_ACK')
 	send_msg(msg, to = recv_ip)
 
-	knocker_p = mp.Process(target = sleep_and_ping, args = (recv_ip, ))
+	knocker_p = Process(target = sleep_and_ping, args = (recv_ip, ))
 	knocker_p.start()
 	
 def le_terminate_handler(my_node):
