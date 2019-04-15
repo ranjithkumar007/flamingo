@@ -65,7 +65,10 @@ def exec_new_job(my_node, job_id, cmd):
 	del my_node.job_pid[job_id]
 	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
 	
-	send_file(os.path.join(params.LOG_DIR, job_id), to = recv_ip, job_id = job_id, file_ty = "log")	
+	log_ip = recv_ip
+	if recv_ip == my_node.self_ip:
+		log_ip = my_node.adj_nodes_ips[0]
+	send_file(os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
 
 	# After running got completed remove this job from individual_running_jobs
 	del my_node.individual_running_jobs[job_id]
@@ -94,15 +97,16 @@ def completed_job_handler(my_node, recv_ip, content):
 	my_node.completed_jobs[job_id]['log_file_ip1'] = recv_ip
 
 def preempt_and_exec_handler(my_node, to, content):
-	preempt_pid = my_node.job_pids[content[1]]
+	preempt_pid = my_node.job_pid[content[1]]
 
 	os.kill(preempt_pid, signal.SIGKILL)
 	print("Preempted this job with id : %s in node %s" % (content[1],my_node.self_ip))
 	msg = Message('PREEMPTED_JOB',content = [my_node.individual_running_jobs[content[1]]])
 	send_msg(msg, to = to)
 	del my_node.individual_running_jobs[content[1]]
-	exec_job_handler(my_node, content[0])
+	del my_node.job_pid[content[1]]
 
+	exec_job_handler(my_node, content[0])
 
 def preempted_job_handler(my_node, recv_addr, content):
 	my_node.running_jobs[recv_addr].remove(content[0])
@@ -111,7 +115,7 @@ def preempted_job_handler(my_node, recv_addr, content):
 def status_job_handler(my_node, recv_addr, content):
 	jobid = content[0]
 	reply = "Waiting"
-	if jobid in my_node.completed_jobs:
+	if jobid in my_node.completed_jobs.keys():
 		reply = "Completed"
 	
 	for key in my_node.running_jobs.keys():
