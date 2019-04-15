@@ -6,6 +6,7 @@ from .utils import send_file
 import os
 import signal
 from . import params
+from multiprocessing import Process
 
 def start_job(my_node, job_id):
 	print("Starting job")
@@ -37,6 +38,8 @@ def exec_job_handler(my_node, job):
 		
 		start_job(my_node, job.job_id)
 		return
+	# storing job in indiviudual_running_jobs
+	my_node.indiviudual_running_jobs[job.job_id] = job
 
 	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
 	send_msg(msg, to = job.source_ip)
@@ -46,7 +49,7 @@ def query_files_handler(my_node, recv_ip, content):
 	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "input")
 	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "executable")
 
-def exec_new_job(job_id, cmd, root_ip):
+def exec_new_job(my_node, job_id, cmd):
 	os.chdir(os.path.join(params.EXEC_DIR, job_id))
 	st_tm = time.time()
 	os.system(cmd)
@@ -56,7 +59,6 @@ def exec_new_job(job_id, cmd, root_ip):
 	tat = end_tm - my_node.job_submitted_time[job_id]
 
 	print("Completed job")
-
 	msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
 	send_msg(msg, to = root_ip)
 
@@ -64,6 +66,9 @@ def exec_new_job(job_id, cmd, root_ip):
 	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
 	
 	send_file(os.path.join(params.LOG_DIR, job_id), to = recv_ip, job_id = job_id, file_ty = "log")	
+
+	# After running got completed remove this job from individual_running_jobs
+	del my_node.individual_running_jobs[job_id]
 	# send leader msg to remove this job from running Q
 
 def log_file_handler(my_node, content):
@@ -83,10 +88,47 @@ def completed_job_handler(my_node, recv_ip, content):
 	
 	if not job_id in my_node.completed_jobs:
 		my_node.completed_jobs[job_id] = {}
-	
+
 	my_node.completed_jobs[job_id]['turn_around_time'] = tat
 	my_node.completed_jobs[job_id]['job_run_time'] = job_run_time
 	my_node.completed_jobs[job_id]['log_file_ip1'] = recv_ip
+
+def preempt_and_exec_handler(my_node, to, content):
+	preempt_pid = my_node.job_pids[content[1]]
+
+	os.kill(preempt_pid, signal.SIGKILL)
+	print("Preempted this job with id : %s in node %s" % (content[1],my_node.self_ip))
+	msg = Message('PREEMPTED_JOB',content = [my_node.individual_running_jobs[content[1]]])
+	send_msg(msg, to = to)
+	del my_node.individual_running_jobs[content[1]]
+	exec_job_handler(my_node, content[0])
+
+
+def preempted_job_handler(my_node, recv_addr, content):
+	my_node.running_jobs[recv_addr].remove(content[0])
+
+
+def status_job_handler(my_node, recv_addr, content):
+	jobid = content[0]
+	reply = "Waiting"
+	if jobid in my_node.completed_jobs:
+		reply = "Completed"
+	
+	for key in my_node.running_jobs.keys():
+		if jobid in my_node.running_jobs[key]:
+			reply = "Running"
+
+	msg = Message('STATUS_REPLY',content = [jobid, reply])
+	send_msg(msg, to = recv_addr)
+
+def print_status_reply(my_node, content):
+	jobid = content[0]
+	reply = content[1]
+	print("Status of job with jobid %s is %s" % (jobid,reply))
+
+	# woke the submit_interface process
+	os.kill(my_node.submit_interface_pid, signal.SIGUSR1)
+	
 
 def log_file_ack_handler(my_node, recv_ip):
 	if not job_id in my_node.completed_jobs:

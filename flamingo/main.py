@@ -61,6 +61,7 @@ def main():
 
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
+    my_node.submit_interface_pid = interface_p.pid
 
     if my_node.self_ip == my_node.root_ip:
         my_node.running_jobs = manager.dict()
@@ -68,8 +69,8 @@ def main():
 
         matchmaker_p = Process(target = matchmaking, args = (my_node, ))
         matchmaker_p.start()
-
         my_node.matchmaker_pid = matchmaker_p.pid
+
 
     # start receiving messages
     msg_socket = build_socket(self_ip)
@@ -113,8 +114,14 @@ def main():
             handlers.log_file_ack_handler(my_node, recv_addr)
         elif msg.msg_type == 'COMPLETED_JOB':
             handlers.completed_job_handler(my_node, recv_addr, content)
-
-
+        elif msg.msg_type == 'PREEMPT_AND_EXEC':
+            handlers.preempt_and_exec_handler(my_node, recv_addr, msg.content)
+        elif msg.msg_type == 'PREEMPTED_JOB':
+            handlers.preempted_job_handler(my_node, recv_addr, msg.content)
+        elif msg.msg_type == 'STATUS_JOB':
+            handlers.status_job_handler(my_node, recv_addr, msg.content)
+        elif msg.msg_type == 'STATUS_REPLY':
+            handlers.print_status_reply(my_node, msg.content)
 
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False
