@@ -15,6 +15,7 @@ from core.node import Node
 from core.messages.message import Message
 from core.messages import handlers
 from core.submit_interface import submit_interface
+from core.recovery import crash_detector
 
 def build_socket(self_ip):
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -118,12 +119,19 @@ def main():
             handlers.status_job_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'STATUS_REPLY':
             handlers.print_status_reply(my_node, msg.content)
+        elif msg.msg_type == 'GET_ALIVE_NODE':
+            handlers.get_alive_node_handler(my_node, recv_addr, msg.content)
+        elif msg.msg_type == 'GET_ALIVE_NODE_ACK':
+            handlers.get_alive_node_ack_handler(my_node, msg.content)
+
 
 
         if my_node.le_elected and my_node.self_ip == my_node.root_ip and not matchmaker_started:    
             
             my_node.running_jobs = manager.dict()
             my_node.leader_jobPQ = JobPQ(manager)
+            my_node.last_heartbeat_ts = manager.dict()
+
             matchmaker_p = Process(target = matchmaking, args = (my_node, ))
             matchmaker_p.start()
 
@@ -132,9 +140,13 @@ def main():
             my_node.matchmaker_pid = matchmaker_p.pid
             matchmaker_started = True
 
+            crash_detector_p = Process(target = crash_detect, args = (my_node, ))
+            crash_detector_p.start()
+
+            print("Starting Crash Detector")
+
+            my_node.crash_detector_pid = crash_detector_p.pid
             
-
-
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False
 

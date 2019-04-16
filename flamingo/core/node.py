@@ -24,6 +24,10 @@ class Node:
 		self.completed_jobs = {}
 		self.leader_jobPQ = None
 		self.matchmaker_pid = None
+
+		self.last_heartbeat_ts = None
+		self.crash_detector_pid = None
+
 		self.job_pid = {}
 		self.submit_interface_pid = None
 

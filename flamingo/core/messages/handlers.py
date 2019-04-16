@@ -4,6 +4,7 @@ import time
 from .utils import send_file
 import os
 import signal
+import random
 from . import params
 from multiprocessing import Process
 
@@ -17,6 +18,13 @@ def start_job(my_node, job_id, recv_ip):
 	my_node.job_pid[job_id] = exec_p.pid
 	print("job pid added")
 	print(my_node.job_pid)
+
+
+def get_random_alive_node(my_node, not_ip = None):
+	while 1:
+		ip = random.choice(my_node.resources.keys())
+		if ip != not_ip:
+			return ip
 
 def exec_job_handler(my_node, job):
 	inp_fp = job.attr['input_path']
@@ -70,15 +78,30 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 	del my_node.job_pid[job_id]
 	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
 	
-	log_ip = source_ip
-	if source_ip == my_node.self_ip:
-		log_ip = my_node.adj_nodes_ips[0]
-
-	send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
-
 	# After running got completed remove this job from individual_running_jobs
 	del my_node.individual_running_jobs[job_id]
+
+
+	log_ip = source_ip
+	if source_ip == my_node.self_ip:
+		msg = Message('GET_ALIVE_NODE', content = [source_ip, job_id])
+		send_msg(msg, to = my_node.root_ip)
+	else:
+		send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
+
 	# send leader msg to remove this job from running Q
+
+def get_alive_node_handler(my_node, recv_ip, content):
+	not_ip, job_id = content
+
+	ip = get_random_alive_node(my_node, not_ip)
+	msg = Message('GET_ALIVE_NODE_ACK', content = ip)
+
+	send_msg(msg, to = recv_ip)
+
+def get_alive_node_ack_handler(my_node, content):
+	log_ip, job_id = content
+	send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")		
 
 def log_file_handler(my_node, content):
 	job_id, file_ty, file_content = content
@@ -180,7 +203,7 @@ def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
 
 def backup_elect_handler(my_node):
-	my_node.backup_ip = my_node.adj_nodes_ips[0]
+	my_node.backup_ip = get_random_alive_node(my_node) # my_node.adj_nodes_ips[0]
 	msg = Message('BACKUP_QUERY')
 	send_msg(msg, to = my_node.backup_ip)
 
@@ -228,6 +251,7 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 	# call matchmaker
 	node_jobQ, node_res = content
 	my_node.resources[recv_ip] = node_res
+	my_node.last_heartbeat_ts[recv_ip] = time.time()
 
 	for job_i in node_jobQ:
 		my_node.leader_jobPQ.put(job_i)
