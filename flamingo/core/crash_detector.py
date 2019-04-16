@@ -2,12 +2,7 @@ import signal
 import time
 import sys
 import os
-from . import params 
 
-import signal
-import time
-import sys
-import os
 from .recovery import params
 from .messages.utils import add_log
 

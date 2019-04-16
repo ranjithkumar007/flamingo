@@ -1,7 +1,7 @@
 from .message import Message
 from .utils import send_msg, get_job_status, start_job, \
 				get_random_alive_node, send_file, exec_new_job, add_log, send_heartbeat,\
-				sleep_and_ping, get_leaderstate, get_resources
+				sleep_and_ping, get_leaderstate, get_resources, sleep_and_ping_backup
 import time
 import os
 import signal
@@ -147,21 +147,30 @@ def backup_query_handler(my_node):
 	msg = Message('BACKUP_HEARTBEAT')
 	send_msg(msg, to = my_node.root_ip, my_node = my_node)
 
+def elect_new_leader_handler(my_node):
+	#need to elect new leader and send the state
+	resources = my_node.backup_state[3]
+	new_leader_ip = get_random_alive_node(resources, my_node.root_ip, my_node.self_ip)
+
+	#remove old leader from resources list
+	my_node.backup_state[3].remove(my_node.root_ip_dict['ip'])
+
+	print("New leader elected with ip %s",new_leader_ip)
+
+	msg = Message('U_ARE_LEADER',content = my_node.backup_state)
+	send_msg(msg, to = new_leader_ip)
+
+
 def backup_heartbeat_handler(my_node):
 
 	mystate = get_leaderstate(my_node)
 	msg = Message('BACKUP_HEARTBEAT_ACK',content = mystate)
 	send_msg(msg,to = my_node.backup_ip, my_node = my_node)
 
-def sleep_and_ping_backup(to):
-	time.sleep(params.BACKUP_HEARTBEAT_INTERVAL)
-	msg = Message('BACKUP_HEARTBEAT')
-	send_msg(msg, to, my_node = my_node)
-
-
 def backup_heartbeat_ack_handler(my_node, content):
+	my_node.leader_last_seen = time.time()
 	my_node.backup_state = content
-	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node.root_ip_dict['ip']))
+	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node, my_node.root_ip_dict['ip']))
 	knocker_p.start()
 
 def backup_elect_handler(my_node):

@@ -13,7 +13,7 @@ import time
 from multiprocessing import Process
 
 def add_log(my_node, log, ty):
-    # print(log)
+    print(log)
     my_node.log_q.put((ty, log))
     os.kill(my_node.pids['logging'], signal.SIGUSR1)
 
@@ -28,6 +28,11 @@ def send_heartbeat(my_node, to):
     msg = Message('HEARTBEAT', content = [jobQ_cp, cur_res])
     
     my_node.last_jobs_sent = len(msg.content[0])
+    send_msg(msg, to, my_node = my_node)
+
+def sleep_and_ping_backup(my_node, to):
+    time.sleep(params.BACKUP_HEARTBEAT_INTERVAL)
+    msg = Message('BACKUP_HEARTBEAT')
     send_msg(msg, to, my_node = my_node)
 
 def sleep_and_ping(my_node, to):
@@ -121,37 +126,37 @@ def get_resources():
     return res
 
 def create_socket(to , my_node):
-	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-	if not my_node.le_elected:
-		while 1:
-			try:
-				sock.connect((to, params.CLIENT_RECV_PORT))
-				break
-			except ConnectionRefusedError:
-				pass
-	else:
-		flg = 0 
-		for i in range(params.MAX_SEND_RETRIES):
-			try:
-				sock.connect((to, params.CLIENT_RECV_PORT))
-				flg = 1
-				break
-			except ConnectionRefusedError:
-				pass
+    if not my_node.le_elected:
+        while 1:
+            try:
+                sock.connect((to, params.CLIENT_RECV_PORT))
+                break
+            except ConnectionRefusedError:
+                pass
+    else:
+        flg = 0 
+        for i in range(params.MAX_SEND_RETRIES):
+            try:
+                sock.connect((to, params.CLIENT_RECV_PORT))
+                flg = 1
+                break
+            except ConnectionRefusedError:
+                pass
 
-		if flg == 0 :
-			return None
+        if flg == 0 :
+            return None
 
     return sock
 
 # check if alive, return true/false
 def send_msg(msg, to, sock = None, my_node = None):
-	if not sock:
-		sock = create_socket(to, my_node)
-		if not sock:
-			my_node.failed_msgs.append(msg)
-			return
+    if not sock:
+        sock = create_socket(to, my_node)
+        if not sock:
+            my_node.failed_msgs.append(msg)
+            return
 
     msg_data = io.BytesIO(pickle.dumps(msg))
 
@@ -170,7 +175,7 @@ def send_msg(msg, to, sock = None, my_node = None):
         ty = "DEBUG" 
 
     add_log(my_node, 'sent msg of type %s to %s' % (msg.msg_type, to), ty)
-    # print('sent msg of type %s to %s' % (msg.msg_type, to))
+    print('sent msg of type %s to %s' % (msg.msg_type, to))
     
 def send_file(filepath, to, job_id, file_ty, my_node):
     sock = create_socket(to)
@@ -210,29 +215,28 @@ def recv_msg(conn):
     return msg
 
 def Managerdict_to_dict(mng_dict):
-	tmp_dict = {}
-	for i in mng_dict.keys():
-		tmp_dict[i] = mng_dict[i]
+    tmp_dict = {}
+    for i in mng_dict.keys():
+        tmp_dict[i] = mng_dict[i]
 
-	return tmp_dict 
+    return tmp_dict 
 
 def Managerlist_to_list(mng_list):
-	tmp_list = []
-	for i in mng_list:
-		tmp_list.append(i)
+    tmp_list = []
+    for i in mng_list:
+        tmp_list.append(i)
 
-	return tmp_list 
+    return tmp_list 
 
 
 
 def get_leaderstate(my_node):
 
-	state = [my_node.all_ips,my_node.last_jobs_sent,my_node.completed_jobs]
-	tmp_resources = Managerdict_to_dict(my_node.resources)
-	tmp_jobQ = Managerlist_to_list(my_node.jobQ)
-	tmp_running = Managerdict_to_dict(my_node.running_jobs)
-	tmp_leader_joblist = Managerlist_to_list(my_node.leader_joblist)
-	state += [tmp_resources,tmp_jobQ,tmp_running,tmp_leader_joblist]
+    tmp_resources = Managerdict_to_dict(my_node.resources)
+    tmp_jobQ = Managerlist_to_list(my_node.jobQ)
+    tmp_running = Managerdict_to_dict(my_node.running_jobs)
+    tmp_leader_joblist = Managerlist_to_list(my_node.leader_joblist)
+    state = [my_node.all_ips,my_node.last_jobs_sent,my_node.completed_jobs, \
+                tmp_resources,tmp_jobQ,tmp_running,tmp_leader_joblist]
 
-	return state
->>>>>>> f5f9dd87b9ce77fd8a9cc145a4092e25067a0c16
+    return state

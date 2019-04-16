@@ -69,6 +69,7 @@ def main():
 
     my_node.log_q = manager.Queue()
     my_node.failed_msgs = manager.list()
+    my_node.backup_state = manager.list()
 
     my_node.root_ip_dict = manager.dict()
 
@@ -177,7 +178,9 @@ def main():
 
             my_node.pids['matchmaker'] = matchmaker_p.pid
             my_node.pids['crash_detector'] = crash_detector_p.pid
-            
+        
+        elif msg.msg_type == 'ELECT_NEW_LEADER':
+            handlers.elect_new_leader_handler(my_node)
         elif msg.msg_type == 'I_AM_NEWLEADER':
             handlers.i_am_newleader_handler(my_node,recv_addr)
         else:
