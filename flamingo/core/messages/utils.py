@@ -7,10 +7,12 @@ import psutil
 import os
 from functools import partial
 import logging
+import signal
+import random
 
 def add_log(my_node, log, ty):
 	my_node.log_q.put((ty, log))
-	os.kill(my_node.logging_pid, signal.SIGUSR1)
+	os.kill(my_node.pids['logging'], signal.SIGUSR1)
 
 def send_heartbeat(my_node, to):
 	cur_res = get_resources()
@@ -23,12 +25,12 @@ def send_heartbeat(my_node, to):
 	msg = Message('HEARTBEAT', content = [jobQ_cp, cur_res])
 	
 	my_node.last_jobs_sent = len(msg.content[0])
-	send_msg(msg, to)
+	send_msg(msg, to, my_node = my_node)
 
 def sleep_and_ping(to):
 	time.sleep(params.HEARTBEAT_INTERVAL)
 	msg = Message('ARE_YOU_ALIVE')
-	send_msg(msg, to)
+	send_msg(msg, to, my_node = my_node)
 
 def start_job(my_node, job_id, recv_ip):
 	add_log(my_node, "Starting job " + job_id, "INFO")
@@ -49,7 +51,7 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 
 	add_log(my_node, "Completed job " + job_id, "INFO")
 	msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
-	send_msg(msg, to = my_node.root_ip)
+	send_msg(msg, to = my_node.root_ip, my_node = my_node)
 
 	del my_node.job_pid[job_id]
 	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
@@ -61,9 +63,9 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 	log_ip = source_ip
 	if source_ip == my_node.self_ip:
 		msg = Message('GET_ALIVE_NODE', content = [source_ip, job_id])
-		send_msg(msg, to = my_node.root_ip)
+		send_msg(msg, to = my_node.root_ip, my_node = my_node)
 	else:
-		send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
+		send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log", my_node = my_node)	
 
 	# send leader msg to remove this job from running Q
 
@@ -127,7 +129,7 @@ def create_socket(to):
 	return sock
 
 # check if alive, return true/false
-def send_msg(msg, to, sock = None, close_sock = True):
+def send_msg(msg, to, sock = None, close_sock = True, my_node = None):
 	if not sock:
 		sock = create_socket(to)
 
@@ -146,7 +148,7 @@ def send_msg(msg, to, sock = None, close_sock = True):
 	if close_sock:
 		sock.close()
 
-def send_file(filepath, to, job_id, file_ty):
+def send_file(filepath, to, job_id, file_ty, my_node):
 	sock = create_socket(to)
 
 	if file_ty == 'log':
@@ -167,7 +169,7 @@ def send_file(filepath, to, job_id, file_ty):
 	data = b''.join(data_list)
 	msg.content.append(data)
 
-	send_msg(msg, to, sock)
+	send_msg(msg, to, sock, my_node)
 
 def recv_msg(conn):
 	data = conn.recv(params.BUFFER_SIZE)

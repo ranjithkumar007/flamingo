@@ -106,14 +106,14 @@ def matchmaking(my_node):
 
 			if assigned_ip and not preempt_job_id:
 				msg = Message('EXEC_JOB',content=job)
-				send_msg(msg,to = assigned_ip)
+				send_msg(msg,to = assigned_ip, my_node = my_node)
 
 				my_node.running_jobs[assigned_ip] = my_node.running_jobs[assigned_ip] + [job]
 				# print(my_node.running_jobs)
 
 			if assigned_ip and preempt_job_id:	
 				msg = Message('PREEMPT_AND_EXEC',content=[job, preempt_job_id])
-				send_msg(msg,to = assigned_ip)
+				send_msg(msg,to = assigned_ip, my_node = my_node)
 
 				if not assigned_ip in my_node.running_jobs.keys():
 					my_node.running_jobs[assigned_ip] = []

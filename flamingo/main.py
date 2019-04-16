@@ -15,7 +15,7 @@ from core.node import Node
 from core.messages.message import Message
 from core.messages import handlers
 from core.submit_interface import submit_interface
-from core.recovery import crash_detector
+from core import crash_detector
 from core.mylogger import start_logger
 
 def build_socket(self_ip):
@@ -30,7 +30,7 @@ def build_socket(self_ip):
 def initiate_leader_election(my_node):
     msg = Message('LE_QUERY', content = my_node.self_ip)
     for ip in my_node.adj_nodes_ips:
-        send_msg(msg, to = ip)
+        send_msg(msg, to = ip, my_node = my_node)
 
 def get_my_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -63,6 +63,7 @@ def main():
     my_node.resources = manager.dict()
     my_node.job_pid = manager.dict()
     my_node.lost_resources = manager.dict()
+    my_node.pids = manager.dict()
 
     my_node.log_q = manager.Queue()
 
@@ -72,7 +73,7 @@ def main():
     logging_p = Process(target = start_logger, args = (my_node.log_q, log_file, "INFO"))
     logging_p.start()
 
-    my_node.logging_pid = logging_p.pid
+    my_node.pids['logging'] = logging_p.pid
 
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
     interface_p.start()
@@ -159,7 +160,7 @@ def main():
 
             add_log(my_node,"Starting Matchmaker", ty = "INFO")
 
-            my_node.matchmaker_pid = matchmaker_p.pid
+            my_node.pids['matchmaker'] = matchmaker_p.pid
             matchmaker_started = True
 
             crash_detector_p = Process(target = crash_detect, args = (my_node, ))
@@ -167,7 +168,7 @@ def main():
 
             add_log(my_node,"Starting Crash Detector", ty = "INFO")
 
-            my_node.crash_detector_pid = crash_detector_p.pid
+            my_node.pids['crash_detector'] = crash_detector_p.pid
             
         # if my_node.le_elected and start_daemons:
         #     start_daemons = False
