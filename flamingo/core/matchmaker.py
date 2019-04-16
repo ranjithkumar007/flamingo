@@ -104,6 +104,7 @@ def matchmaking(my_node):
 		while not my_node.leader_jobPQ.empty():
 			job = my_node.leader_jobPQ.get()
 			assigned_ip, preempt_job_id = match(job, my_node.resources, my_node.running_jobs, my_node.lost_resources)
+			my_node.leader_joblist.remove(job)
 
 			if assigned_ip and not preempt_job_id:
 				msg = Message('EXEC_JOB',content=job)
@@ -127,3 +128,4 @@ def matchmaking(my_node):
 
 		for job in poor_jobs:
 			my_node.leader_jobPQ.put(job)
+			my_node.leader_joblist += [job]

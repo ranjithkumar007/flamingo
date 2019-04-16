@@ -17,6 +17,8 @@ from core.messages import handlers
 from core.submit_interface import submit_interface
 from core.crash_detector import crash_detect
 from core.mylogger import start_logger
+from core.leader_crash_detector import leader_crash_detect
+
 
 def build_socket(self_ip):
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -66,6 +68,7 @@ def main():
     my_node.pids = manager.dict()
 
     my_node.log_q = manager.Queue()
+    my_node.failed_msgs = manager.list()
 
     my_node.root_ip_dict = manager.dict()
 
@@ -110,6 +113,8 @@ def main():
             handlers.le_terminate_handler(my_node)
         elif msg.msg_type == 'BACKUP_QUERY':
             handlers.backup_query_handler(my_node)
+            leader_crash_detector_p = Process(target = leader_crash_detect, args = (my_node, ))
+            leader_crash_detector_p.start()
         elif msg.msg_type == 'EXEC_JOB':
             handlers.exec_job_handler(my_node, msg.content)
         elif msg.msg_type == 'QUERY_FILES':
@@ -148,6 +153,33 @@ def main():
             handlers.display_output_ack_handler(my_node, msg.content)
         elif msg.msg_type == 'FWD_DISPLAY_OUTPUT_ACK':
             handlers.fwd_display_output_ack_handler(my_node, msg.content)
+        elif msg.msg_type == 'BACKUP_HEARTBEAT':
+            handlers.backup_heartbeat_handler(my_node)
+        elif msg.msg_type == 'BACKUP_HEARTBEAT_ACK':
+            handlers.backup_heartbeat_ack_handler(my_node, msg.content)
+        elif msg.msg_type == 'U_ARE_LEADER':
+            my_node.running_jobs = manager.dict()
+            my_node.leader_jobPQ = JobPQ(manager)
+            my_node.last_heartbeat_ts = manager.dict()
+            my_node.leader_joblist = manager.list()
+
+            handlers.new_leader_handler(my_node,recv_addr,msg.content)
+            matchmaker_p = Process(target = matchmaking, args = (my_node, ))
+            matchmaker_p.start()
+
+            add_log(my_node, "Starting Matchmaker", ty = "INFO")
+
+            crash_detector_p = Process(target = crash_detect, args = (my_node, ))
+            crash_detector_p.start()
+
+            add_log(my_node, "Starting Crash Detector", ty = "INFO")
+            time.sleep(5)
+
+            my_node.pids['matchmaker'] = matchmaker_p.pid
+            my_node.pids['crash_detector'] = crash_detector_p.pid
+            
+        elif msg.msg_type == 'I_AM_NEWLEADER':
+            handlers.i_am_newleader_handler(my_node,recv_addr)
         else:
             add_log(my_node,"Message of unexpected msg type" + msg.msg_type, ty = "DEBUG")
 
@@ -157,6 +189,7 @@ def main():
             my_node.running_jobs = manager.dict()
             my_node.leader_jobPQ = JobPQ(manager)
             my_node.last_heartbeat_ts = manager.dict()
+            my_node.leader_joblist = manager.list()
 
             matchmaker_p = Process(target = matchmaking, args = (my_node, ))
             matchmaker_p.start()

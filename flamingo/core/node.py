@@ -28,6 +28,9 @@ class Node:
 		# self.matchmaker_pid = None
 		self.pids = None
 
+		#proxy for leader_jobPQ to share the leader state with backup
+		self.leader_joblist = None
+
 		self.last_heartbeat_ts = None
 		# self.crash_detector_pid = None
 
@@ -39,3 +42,9 @@ class Node:
 		self.individual_running_jobs = {}
 
 		self.job_submitted_time = {}
+
+
+		self.backup_state = []
+		self.leader_last_seen = None
+
+		self.failed_msgs = []

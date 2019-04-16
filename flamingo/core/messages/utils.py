@@ -120,21 +120,38 @@ def get_resources():
     }
     return res
 
-def create_socket(to):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    while 1:
-        try:
-            sock.connect((to, params.CLIENT_RECV_PORT))
-            break
-        except ConnectionRefusedError:
-            pass
+def create_socket(to , my_node):
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+	if not my_node.le_elected:
+		while 1:
+			try:
+				sock.connect((to, params.CLIENT_RECV_PORT))
+				break
+			except ConnectionRefusedError:
+				pass
+	else:
+		flg = 0 
+		for i in range(params.MAX_SEND_RETRIES):
+			try:
+				sock.connect((to, params.CLIENT_RECV_PORT))
+				flg = 1
+				break
+			except ConnectionRefusedError:
+				pass
+
+		if flg == 0 :
+			return None
 
     return sock
 
 # check if alive, return true/false
 def send_msg(msg, to, sock = None, my_node = None):
-    if not sock:
-        sock = create_socket(to)
+	if not sock:
+		sock = create_socket(to, my_node)
+		if not sock:
+			my_node.failed_msgs.append(msg)
+			return
 
     msg_data = io.BytesIO(pickle.dumps(msg))
 
@@ -191,3 +208,31 @@ def recv_msg(conn):
     assert isinstance(msg, Message), "Received object on socket not of type Message."
 
     return msg
+
+def Managerdict_to_dict(mng_dict):
+	tmp_dict = {}
+	for i in mng_dict.keys():
+		tmp_dict[i] = mng_dict[i]
+
+	return tmp_dict 
+
+def Managerlist_to_list(mng_list):
+	tmp_list = []
+	for i in mng_list:
+		tmp_list.append(i)
+
+	return tmp_list 
+
+
+
+def get_leaderstate(my_node):
+
+	state = [my_node.all_ips,my_node.last_jobs_sent,my_node.completed_jobs]
+	tmp_resources = Managerdict_to_dict(my_node.resources)
+	tmp_jobQ = Managerlist_to_list(my_node.jobQ)
+	tmp_running = Managerdict_to_dict(my_node.running_jobs)
+	tmp_leader_joblist = Managerlist_to_list(my_node.leader_joblist)
+	state += [tmp_resources,tmp_jobQ,tmp_running,tmp_leader_joblist]
+
+	return state
+>>>>>>> f5f9dd87b9ce77fd8a9cc145a4092e25067a0c16

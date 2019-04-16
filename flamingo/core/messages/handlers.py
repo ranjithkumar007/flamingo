@@ -1,7 +1,7 @@
 from .message import Message
 from .utils import send_msg, get_job_status, start_job, \
 				get_random_alive_node, send_file, exec_new_job, add_log, send_heartbeat,\
-				sleep_and_ping
+				sleep_and_ping, get_leaderstate, get_resources
 import time
 import os
 import signal
@@ -143,6 +143,26 @@ def files_content_handler(my_node, recv_ip, content):
 
 def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
+	my_node.leader_last_seen =  time.time()
+	msg = Message('BACKUP_HEARTBEAT')
+	send_msg(msg, to = my_node.root_ip, my_node = my_node)
+
+def backup_heartbeat_handler(my_node):
+
+	mystate = get_leaderstate(my_node)
+	msg = Message('BACKUP_HEARTBEAT_ACK',content = mystate)
+	send_msg(msg,to = my_node.backup_ip, my_node = my_node)
+
+def sleep_and_ping_backup(to):
+	time.sleep(params.BACKUP_HEARTBEAT_INTERVAL)
+	msg = Message('BACKUP_HEARTBEAT')
+	send_msg(msg, to, my_node = my_node)
+
+
+def backup_heartbeat_ack_handler(my_node, content):
+	my_node.backup_state = content
+	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node.root_ip_dict['ip']))
+	knocker_p.start()
 
 def backup_elect_handler(my_node):
 	my_node.backup_ip = my_node.adj_nodes_ips[0] #get_random_alive_node(my_node) 
@@ -212,7 +232,6 @@ def fwd_display_output_ack_handler(my_node, content):
 
 	# see for backup
 
-
 # both task and resource manager combined
 def heartbeat_handler(my_node, recv_ip, content, manager):
 	# call matchmaker
@@ -223,6 +242,9 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 
 	for job_i in node_jobQ:
 		my_node.leader_jobPQ.put(job_i)
+
+	for job_i in node_jobQ:
+		my_node.leader_joblist += [job_i]
 
 	if not recv_ip in my_node.running_jobs.keys():
 		my_node.running_jobs[recv_ip] = manager.list()
@@ -287,3 +309,48 @@ def le_accept_handler(my_node, recv_ip, new_root_ip, is_accept = True):
 def le_reject_handler(my_node, recv_ip, new_root_ip):
 	# pass
 	return le_accept_handler(my_node, recv_ip, new_root_ip, False)
+
+
+def new_leader_handler(my_node, recv_ip , content):
+
+	my_node.all_ips = content[0]
+	my_node.completed_jobs = content[2]
+	resources = content[3]
+	for key in resources.keys():
+		my_node.resources[key] = resources[key]
+
+	my_node.jobQ += content[4]
+
+	for key in content[5].keys():
+		my_node.running_jobs[key] = content[5][key]
+
+	for job in content[6]:
+		my_node.leader_jobPQ.put(job)
+		my_node.leader_joblist += [job]
+
+	my_node.root_ip = my_node.self_ip
+	my_node.root_ip_dict['ip'] = my_node.self_ip
+	my_node.backup_ip = recv_ip
+
+
+	msg = Message("I_AM_NEWLEADER")
+
+	for ip in my_node.all_ips:
+		send_msg(msg, to = ip, my_node = my_node)
+
+def i_am_newleader_handler(my_node,recv_ip):
+
+	my_node.root_ip = recv_ip
+	my_node.root_ip_dict['ip'] = recv_ip
+
+
+	#send failed messages
+
+	for msg in my_node.failed_msgs:
+		send_msg(msg,to = my_node.root_ip, my_node = my_node)
+
+
+
+	send_heartbeat(my_node, to = my_node.root_ip)
+
+
