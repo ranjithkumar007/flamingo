@@ -15,8 +15,10 @@ from core.node import Node
 from core.messages.message import Message
 from core.messages import handlers
 from core.submit_interface import submit_interface
-from core import crash_detector
-from core import leader_crash_detector
+from core.crash_detector import crash_detect
+from core.leader_crash_detector import leader_crash_detect
+
+
 
 def build_socket(self_ip):
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -148,7 +150,7 @@ def main():
             my_node.crash_detector_pid = crash_detector_p.pid
 
         elif msg.msg_type == 'I_AM_NEWLEADER':
-            handlers.i_am_newleader_handler(my_node,recv_ip)
+            handlers.i_am_newleader_handler(my_node,recv_addr)
             
 
 
