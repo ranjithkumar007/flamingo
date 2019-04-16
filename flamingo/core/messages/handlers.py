@@ -54,7 +54,7 @@ def exec_job_handler(my_node, job):
 	
 
 	msg = Message('QUERY_FILES', content = [job.job_id, inp_fp, exec_fp])
-	send_msg(msg, to = job.source_ip)
+	send_msg(msg, to = job.source_ip, my_node = my_node)
 
 def query_files_handler(my_node, recv_ip, content):
 	job_id = content[0]
@@ -72,7 +72,7 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 
 	print("Completed job")
 	msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
-	send_msg(msg, to = my_node.root_ip)
+	send_msg(msg, to = my_node.root_ip, my_node = my_node)
 
 	print(my_node.job_pid)
 	del my_node.job_pid[job_id]
@@ -85,7 +85,7 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 	log_ip = source_ip
 	if source_ip == my_node.self_ip:
 		msg = Message('GET_ALIVE_NODE', content = [source_ip, job_id])
-		send_msg(msg, to = my_node.root_ip)
+		send_msg(msg, to = my_node.root_ip, my_node = my_node)
 	else:
 		send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
 
@@ -97,7 +97,7 @@ def get_alive_node_handler(my_node, recv_ip, content):
 	ip = get_random_alive_node(my_node, not_ip)
 	msg = Message('GET_ALIVE_NODE_ACK', content = ip)
 
-	send_msg(msg, to = recv_ip)
+	send_msg(msg, to = recv_ip, my_node = my_node)
 
 def get_alive_node_ack_handler(my_node, content):
 	log_ip, job_id = content
@@ -111,7 +111,7 @@ def log_file_handler(my_node, content):
 		fp.write(file_content)
 
 	msg = Message('LOG_FILE_ACK', content = job_id)	
-	send_msg(msg, to = my_node.root_ip)
+	send_msg(msg, to = my_node.root_ip, my_node = my_node)
 
 def completed_job_handler(my_node, recv_ip, content):
 	# print(my_node.completed_jobs)
@@ -141,7 +141,7 @@ def preempt_and_exec_handler(my_node, to, content):
 	os.kill(preempt_pid, signal.SIGKILL)
 	print("Preempted this job with id : %s in node %s" % (content[1],my_node.self_ip))
 	msg = Message('PREEMPTED_JOB',content = [my_node.individual_running_jobs[content[1]]])
-	send_msg(msg, to = to)
+	send_msg(msg, to = to, my_node = my_node)
 	del my_node.individual_running_jobs[content[1]]
 	del my_node.job_pid[content[1]]
 
@@ -165,7 +165,7 @@ def status_job_handler(my_node, recv_addr, content):
 				break
 
 	msg = Message('STATUS_REPLY',content = [jobid, reply])
-	send_msg(msg, to = recv_addr)
+	send_msg(msg, to = recv_addr, my_node = my_node)
 
 def print_status_reply(my_node, content):
 	jobid = content[0]
@@ -203,24 +203,24 @@ def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
 	my_node.leader_last_seen =  time.time()
 	msg = Message('BACKUP_HEARTBEAT')
-	send_msg(msg, to = my_node.root_ip)
+	send_msg(msg, to = my_node.root_ip, my_node = my_node)
 
 def backup_heartbeat_handler(my_node):
 
 	mystate = get_leaderstate(my_node)
 	msg = Message('BACKUP_HEARTBEAT_ACK',content = mystate)
-	send_msg(msg,to = my_node.backup_ip)
+	send_msg(msg,to = my_node.backup_ip, my_node = my_node)
 
 def sleep_and_ping_backup(to):
 	time.sleep(params.BACKUP_HEARTBEAT_INTERVAL)
 	msg = Message('BACKUP_HEARTBEAT')
-	send_msg(msg, to)
+	send_msg(msg, to, my_node = my_node)
 
 
 def backup_heartbeat_ack_handler(my_node, content):
 
 	my_node.backup_state = content
-	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node.root_ip))
+	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node.root_ip_dict['ip']))
 	knocker_p.start()
 
 
@@ -231,7 +231,7 @@ def backup_heartbeat_ack_handler(my_node, content):
 def backup_elect_handler(my_node):
 	my_node.backup_ip = get_random_alive_node(my_node) # my_node.adj_nodes_ips[0]
 	msg = Message('BACKUP_QUERY')
-	send_msg(msg, to = my_node.backup_ip)
+	send_msg(msg, to = my_node.backup_ip, my_node = my_node)
 
 def le_result_handler(my_node):
 	print(my_node.self_ip, " is the leader")
@@ -240,7 +240,7 @@ def le_result_handler(my_node):
 
 	msg = Message('LE_TERMINATE')
 	for ip in my_node.children:
-		send_msg(msg, to = ip)
+		send_msg(msg, to = ip, my_node = my_node)
 
 	send_heartbeat(my_node, to = my_node.self_ip)
 
@@ -265,12 +265,12 @@ def send_heartbeat(my_node, to):
 	print(msg.content[1])
 	
 	my_node.last_jobs_sent = len(msg.content[0])
-	send_msg(msg, to)
+	send_msg(msg, to, my_node = my_node)
 
 def sleep_and_ping(to):
 	time.sleep(params.HEARTBEAT_INTERVAL)
 	msg = Message('ARE_YOU_ALIVE')
-	send_msg(msg, to)
+	send_msg(msg, to, my_node = my_node)
 
 # both task and resource manager combined
 def heartbeat_handler(my_node, recv_ip, content, manager):
@@ -294,7 +294,7 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 	os.kill(my_node.matchmaker_pid, signal.SIGUSR1)
 
 	msg = Message('HEARTBEAT_ACK')
-	send_msg(msg, to = recv_ip)
+	send_msg(msg, to = recv_ip, my_node = my_node)
 
 	knocker_p = Process(target = sleep_and_ping, args = (recv_ip, ))
 	knocker_p.start()
@@ -305,7 +305,7 @@ def le_terminate_handler(my_node):
 	my_node.root_ip_dict['ip'] = my_node.root_ip
 
 	for ip in my_node.children:
-		send_msg(msg, to = ip)
+		send_msg(msg, to = ip, my_node = my_node)
 
 	send_heartbeat(my_node, to = my_node.root_ip)
 
@@ -319,15 +319,15 @@ def le_query_handler(my_node, recv_ip, new_root_ip):
 		msg = Message('LE_QUERY', content = my_node.root_ip)
 		for ip in my_node.adj_nodes_ips:
 			if ip != recv_ip:
-				send_msg(msg, to = ip)
+				send_msg(msg, to = ip, my_node = my_node)
 
 		if len(my_node.adj_nodes_ips) == 1:
 			msg = Message('LE_ACCEPT', content = my_node.root_ip)
-			send_msg(msg, to = my_node.par)
+			send_msg(msg, to = my_node.par, my_node = my_node)
 
 	else:
 		msg = Message('LE_REJECT', content = my_node.root_ip)
-		send_msg(msg, to = recv_ip)
+		send_msg(msg, to = recv_ip, my_node = my_node)
 
 def le_accept_handler(my_node, recv_ip, new_root_ip, is_accept = True):
 	if my_node.root_ip == new_root_ip:
@@ -343,8 +343,53 @@ def le_accept_handler(my_node, recv_ip, new_root_ip, is_accept = True):
 			
 		if my_node.root_ip != my_node.self_ip and my_node.le_acks[my_node.root_ip] == (len(my_node.adj_nodes_ips) - 1):
 			msg = Message('LE_ACCEPT', content = my_node.root_ip)
-			send_msg(msg, to = my_node.par)
+			send_msg(msg, to = my_node.par, my_node = my_node)
 
 def le_reject_handler(my_node, recv_ip, new_root_ip):
 	# pass
 	return le_accept_handler(my_node, recv_ip, new_root_ip, False)
+
+
+def new_leader_handler(my_node, recv_ip , content):
+
+	my_node.all_ips = content[0]
+	my_node.completed_jobs = content[2]
+	resources = content[3]
+	for key in resources.keys():
+		my_node.resources[key] = resources[key]
+
+	my_node.jobQ += content[4]
+
+	for key in content[5].keys():
+		my_node.running_jobs[key] = content[5][key]
+
+	for job in content[6]:
+		my_node.leader_jobPQ.put(job)
+		my_node.leader_joblist += [job]
+
+	my_node.root_ip = my_node.self_ip
+	my_node.root_ip_dict['ip'] = my_node.self_ip
+	my_node.backup_ip = recv_ip
+
+
+	msg = Message("I_AM_NEWLEADER")
+
+	for ip in my_node.all_ips:
+		send_msg(msg, to = ip, my_node = my_node)
+
+def i_am_newleader_handler(my_node,recv_ip):
+
+	my_node.root_ip = recv_ip
+	my_node.root_ip_dict['ip'] = recv_ip
+
+
+	#send failed messages
+
+	for msg in my_node.failed_msgs:
+		send_msg(msg,to = my_node.root_ip, my_node = my_node)
+
+
+
+	send_heartbeat(my_node, to = my_node.root_ip)
+
+

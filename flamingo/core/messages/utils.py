@@ -16,21 +16,39 @@ def get_resources():
 	}
 	return res
 
-def create_socket(to):
+def create_socket(to , my_node):
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	while 1:
-		try:
-			sock.connect((to, params.CLIENT_RECV_PORT))
-			break
-		except ConnectionRefusedError:
-			pass
+
+	if not my_node.le_elected:
+		while 1:
+			try:
+				sock.connect((to, params.CLIENT_RECV_PORT))
+				break
+			except ConnectionRefusedError:
+				pass
+	else:
+		flg = 0 
+		for i in range(3):
+			try:
+				sock.connect((to, params.CLIENT_RECV_PORT))
+				flg = 1
+				break
+			except ConnectionRefusedError:
+				pass
+
+		if flg == 0 :
+			return None
+
 
 	return sock
 
 # check if alive, return true/false
-def send_msg(msg, to, sock = None, close_sock = True):
+def send_msg(msg, to, sock = None, close_sock = True,my_node):
 	if not sock:
-		sock = create_socket(to)
+		sock = create_socket(to, my_node)
+		if not sock:
+			my_node.failed_msgs.append(msg)
+			return
 
 	msg_data = io.BytesIO(pickle.dumps(msg))
 

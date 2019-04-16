@@ -42,3 +42,5 @@ class Node:
 
 		self.backup_state = []
 		self.leader_last_seen = None
+
+		self.failed_msgs = []
