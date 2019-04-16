@@ -23,6 +23,10 @@ class Node:
 		self.running_jobs = None
 		self.completed_jobs = {}
 		self.leader_jobPQ = None
+
+		#proxy for leader_jobPQ to share the leader state with backup
+		self.leader_joblist = None
+
 		self.matchmaker_pid = None
 
 		self.last_heartbeat_ts = None
@@ -34,3 +38,7 @@ class Node:
 		self.individual_running_jobs = {}
 
 		self.job_submitted_time = {}
+
+
+		self.backup_state = []
+		self.leader_last_seen = None

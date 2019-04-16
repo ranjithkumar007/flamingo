@@ -16,6 +16,7 @@ from core.messages.message import Message
 from core.messages import handlers
 from core.submit_interface import submit_interface
 from core.recovery import crash_detector
+from core.recovery import leader_crash_detector
 
 def build_socket(self_ip):
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -93,6 +94,8 @@ def main():
             handlers.le_terminate_handler(my_node)
         elif msg.msg_type == 'BACKUP_QUERY':
             handlers.backup_query_handler(my_node)
+            leader_crash_detector_p = Process(target = leader_crash_detect, args = (my_node, ))
+            leader_crash_detector_p.start()
         elif msg.msg_type == 'EXEC_JOB':
             handlers.exec_job_handler(my_node, msg.content)
         elif msg.msg_type == 'QUERY_FILES':
@@ -123,7 +126,10 @@ def main():
             handlers.get_alive_node_handler(my_node, recv_addr, msg.content)
         elif msg.msg_type == 'GET_ALIVE_NODE_ACK':
             handlers.get_alive_node_ack_handler(my_node, msg.content)
-
+        elif msg.msg_type == 'BACKUP_HEARTBEAT':
+            handlers.backup_heartbeat_handler(my_node)
+        elif msg.msg_type == 'BACKUP_HEARTBEAT_ACK':
+            handlers.backup_heartbeat_ack_handler(my_node, msg.content)
 
 
         if my_node.le_elected and my_node.self_ip == my_node.root_ip and not matchmaker_started:    
@@ -131,6 +137,7 @@ def main():
             my_node.running_jobs = manager.dict()
             my_node.leader_jobPQ = JobPQ(manager)
             my_node.last_heartbeat_ts = manager.dict()
+            my_node.leader_joblist = manager.list()
 
             matchmaker_p = Process(target = matchmaking, args = (my_node, ))
             matchmaker_p.start()

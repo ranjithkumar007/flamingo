@@ -1,5 +1,5 @@
 from .message import Message
-from .utils import send_msg, get_resources
+from .utils import send_msg, get_resources, get_leaderstate
 import time
 from .utils import send_file
 import os
@@ -201,6 +201,32 @@ def files_content_handler(my_node, recv_ip, content):
 
 def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
+	my_node.leader_last_seen =  time.time()
+	msg = Message('BACKUP_HEARTBEAT')
+	send_msg(msg, to = my_node.root_ip)
+
+def backup_heartbeat_handler(my_node):
+
+	mystate = get_leaderstate(my_node)
+	msg = Message('BACKUP_HEARTBEAT_ACK',content = mystate)
+	send_msg(msg,to = my_node.backup_ip)
+
+def sleep_and_ping_backup(to):
+	time.sleep(params.BACKUP_HEARTBEAT_INTERVAL)
+	msg = Message('BACKUP_HEARTBEAT')
+	send_msg(msg, to)
+
+
+def backup_heartbeat_ack_handler(my_node, content):
+
+	my_node.backup_state = content
+	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node.root_ip))
+	knocker_p.start()
+
+
+
+
+
 
 def backup_elect_handler(my_node):
 	my_node.backup_ip = get_random_alive_node(my_node) # my_node.adj_nodes_ips[0]
@@ -255,6 +281,9 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 
 	for job_i in node_jobQ:
 		my_node.leader_jobPQ.put(job_i)
+
+	for job_i in node_jobQ:
+		my_node.leader_joblist += [job_i]
 
 	if not recv_ip in my_node.running_jobs.keys():
 		my_node.running_jobs[recv_ip] = manager.list()

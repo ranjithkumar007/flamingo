@@ -81,3 +81,31 @@ def recv_msg(conn):
 	assert isinstance(msg, Message), "Received object on socket not of type Message."
 
 	return msg
+
+
+def Managerdict_to_dict(mng_dict):
+	tmp_dict = {}
+	for i in mng_dict.keys():
+		tmp_dict[i] = mng_dict[i]
+
+	return tmp_dict 
+
+def Managerlist_to_list(mng_list):
+	tmp_list = []
+	for i in mng_list:
+		tmp_list.append(i)
+
+	return tmp_list 
+
+
+
+def get_leaderstate(my_node):
+
+	state = [my_node.all_ips,my_node.last_jobs_sent,my_node.completed_jobs]
+	tmp_resources = Managerdict_to_dict(my_node.resources)
+	tmp_jobQ = Managerlist_to_list(my_node.jobQ)
+	tmp_running = Managerdict_to_dict(my_node.running_jobs)
+	tmp_leader_joblist = Managerlist_to_list(my_node.leader_joblist)
+	state += [tmp_resources,tmp_jobQ,tmp_running,tmp_leader_joblist]
+
+	return state

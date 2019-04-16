@@ -24,6 +24,7 @@ def crash_detect(my_node):
 		for ip in crashed_nodes:
 			for job in my_node.running_jobs[ip]:
 				my_node.leader_jobPQ.put(job)
+				my_node.leader_joblist += [job]
 				flg = True
 
 			del my_node.running_jobs[ip]
