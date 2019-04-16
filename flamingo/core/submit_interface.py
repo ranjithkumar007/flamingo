@@ -57,5 +57,16 @@ def submit_interface(my_node, newstdin):
 				# Pause this process until response from leader arrives
 				signal.pause()
 					
-			else :
+			elif command == "display_output" : #works only when job is completed
+				if len(slots) == 1:
+					print("Jobid is not given")
+					continue
+
+				job_id = slots[1]
+				msg = Message('DISPLAY_OUTPUT', content = [job_id])
+				send_msg(msg, to = my_node.root_ip_dict['ip'])
+
+				signal.pause()
 				pass
+
+			

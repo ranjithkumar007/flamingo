@@ -6,13 +6,112 @@ from .message import Message
 import psutil
 import os
 from functools import partial
+import logging
+
+def add_log(my_node, log, ty):
+	my_node.log_q.put((ty, log))
+	os.kill(my_node.logging_pid, signal.SIGUSR1)
+
+def send_heartbeat(my_node, to):
+	cur_res = get_resources()
+	my_node.resources[my_node.self_ip] = cur_res
+
+	jobQ_cp = []
+	for job_i in my_node.jobQ:
+		jobQ_cp.append(job_i)
+
+	msg = Message('HEARTBEAT', content = [jobQ_cp, cur_res])
+	
+	my_node.last_jobs_sent = len(msg.content[0])
+	send_msg(msg, to)
+
+def sleep_and_ping(to):
+	time.sleep(params.HEARTBEAT_INTERVAL)
+	msg = Message('ARE_YOU_ALIVE')
+	send_msg(msg, to)
+
+def start_job(my_node, job_id, recv_ip):
+	add_log(my_node, "Starting job " + job_id, "INFO")
+	cmd = "./executable < input > " +  "../../" + params.LOG_DIR + "/" + job_id 
+	
+	exec_p = Process(target = exec_new_job, args = (my_node, job_id, cmd, recv_ip))
+	exec_p.start()
+	my_node.job_pid[job_id] = exec_p.pid
+	
+def exec_new_job(my_node, job_id, cmd, source_ip):
+	os.chdir(os.path.join(params.EXEC_DIR, job_id))
+	st_tm = time.time()
+	os.system(cmd)
+	end_tm = time.time()
+
+	job_run_time = end_tm - st_tm
+	tat = end_tm - my_node.job_submitted_time[job_id]
+
+	add_log(my_node, "Completed job " + job_id, "INFO")
+	msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
+	send_msg(msg, to = my_node.root_ip)
+
+	del my_node.job_pid[job_id]
+	os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
+	
+	# After running got completed remove this job from individual_running_jobs
+	del my_node.individual_running_jobs[job_id]
+
+
+	log_ip = source_ip
+	if source_ip == my_node.self_ip:
+		msg = Message('GET_ALIVE_NODE', content = [source_ip, job_id])
+		send_msg(msg, to = my_node.root_ip)
+	else:
+		send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")	
+
+	# send leader msg to remove this job from running Q
+
+def get_random_alive_node(my_node, not_ip = None):
+	while 1:
+		ip = random.choice(my_node.resources.keys())
+		if ip != not_ip:
+			return ip
+
+def get_job_status(my_node, job_id): # expects my_node to be leader
+	reply = "Waiting"
+	if jobid in my_node.completed_jobs.keys():
+		reply = "Completed"
+	
+	# print(my_node.running_jobs)
+	for key in my_node.running_jobs.keys():
+		for job in my_node.running_jobs[key]:
+			if jobid == job.job_id:
+				reply = "Running"
+				break
+
+	return reply
+
+def create_logger(log_level = logging.INFO, log_filename = None):
+	logger = logging.getLogger()
+	logger.setLevel(log_level)
+
+	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+	if log_filename:
+		fh = logging.FileHandler(log_filename)
+		fh.setLevel(log_level)
+		fh.setFormatter(formatter)
+		logger.addHandler(fh)
+
+	# ch = logging.StreamHandler()
+	# ch.setLevel(log_level)
+	# ch.setFormatter(formatter)
+	# logger.addHandler(ch)
+
+	return logger
 
 def get_resources():
 	res = {
 		'memory' : psutil.virtual_memory().available >> 20,
 		'cpu_usage' : psutil.cpu_percent(),
 		'cores' : psutil.cpu_count(),
-		'process_load' : os.getloadavg()
+		'process_load' : os.getloadavg()[1]
 	}
 	return res
 
@@ -43,7 +142,7 @@ def send_msg(msg, to, sock = None, close_sock = True):
 		sock.send(chunk)
 
 	sock.shutdown(socket.SHUT_WR)
-	print('sent msg of type %s to %s' % (msg.msg_type, to))
+	add_log(my_node, 'sent msg of type %s to %s' % (msg.msg_type, to), "INFO")
 	if close_sock:
 		sock.close()
 
@@ -52,6 +151,8 @@ def send_file(filepath, to, job_id, file_ty):
 
 	if file_ty == 'log':
 		msg_ty = 'LOG_FILE'
+	elif file_ty == 'fwd_display_output_ack':
+		msg_ty = 'FWD_DISPLAY_OUTPUT_ACK'
 	else:
 		msg_ty = 'FILES_CONTENT'
 

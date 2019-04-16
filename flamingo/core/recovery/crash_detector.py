@@ -14,12 +14,12 @@ def crash_detect(my_node):
 			if (time.time() - my_node.last_heartbeat_ts[ip] > params.CRASH_THRESHOLD):
 				crashed_nodes.append(ip)
 
-		print("Crashed nodes : ", crashed_nodes)
+		add_log(my_node, "Crashed nodes : ", crashed_nodes, "INFO")
 		for ip in crashed_nodes:
 			del my_node.resources[ip]
 
 
-		print("rescheduling jobs")
+		add_log(my_node, "rescheduling jobs", "INFO")
 		flg = False
 		for ip in crashed_nodes:
 			for job in my_node.running_jobs[ip]:

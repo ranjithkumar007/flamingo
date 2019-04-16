@@ -20,6 +20,8 @@ class Node:
 
 		self.root_ip_dict = None
 
+		self.log_q = None
+
 		self.running_jobs = None
 		self.completed_jobs = {}
 		self.leader_jobPQ = None
@@ -28,6 +30,8 @@ class Node:
 		self.last_heartbeat_ts = None
 		self.crash_detector_pid = None
 
+		self.logging_pid = None
+		self.lost_resources = None
 		self.job_pid = {}
 		self.submit_interface_pid = None
 
