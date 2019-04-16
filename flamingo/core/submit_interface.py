@@ -21,7 +21,7 @@ def submit_interface(my_node, newstdin):
 
 		while True:
 			inp = input('\n>>')
-			print(inp)
+			# print(inp)
 			slots = inp.split(' ')
 			command = slots[0]
 

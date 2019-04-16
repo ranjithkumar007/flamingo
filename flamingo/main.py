@@ -15,7 +15,7 @@ from core.node import Node
 from core.messages.message import Message
 from core.messages import handlers
 from core.submit_interface import submit_interface
-from core import crash_detector
+from core.crash_detector import crash_detect
 from core.mylogger import start_logger
 
 def build_socket(self_ip):
@@ -72,7 +72,7 @@ def main():
     log_file = 'main_log_data.txt'
     logging_p = Process(target = start_logger, args = (my_node.log_q, log_file, "INFO"))
     logging_p.start()
-
+    time.sleep(5)
     my_node.pids['logging'] = logging_p.pid
 
     interface_p = Process(target = submit_interface, args = (my_node, newstdin))
@@ -97,6 +97,7 @@ def main():
         if 'HEARTBEAT' in msg.msg_type:
             ty = "DEBUG" 
 
+        # print('received msg of type %s from %s' %(msg.msg_type, recv_addr))
         add_log(my_node, 'received msg of type %s from %s' %(msg.msg_type, recv_addr), ty)
 
         if msg.msg_type == 'LE_QUERY':
@@ -141,10 +142,12 @@ def main():
             handlers.get_alive_node_ack_handler(my_node, msg.content)
         elif msg.msg_type == 'DISPLAY_OUTPUT':
             handlers.display_output_handler(my_node, recv_addr, msg.content)
-        elif msg.msg_type == 'FWD_DISPALY_OUTPUT':
+        elif msg.msg_type == 'FWD_DISPLAY_OUTPUT':
             handlers.fwd_display_output_handler(my_node, msg.content)
         elif msg.msg_type == 'DISPLAY_OUTPUT_ACK':
-            msg.display_output_ack_handler(my_node, msg.content)
+            handlers.display_output_ack_handler(my_node, msg.content)
+        elif msg.msg_type == 'FWD_DISPLAY_OUTPUT_ACK':
+            handlers.fwd_display_output_ack_handler(my_node, msg.content)
         else:
             add_log(my_node,"Message of unexpected msg type" + msg.msg_type, ty = "DEBUG")
 
@@ -157,17 +160,19 @@ def main():
 
             matchmaker_p = Process(target = matchmaking, args = (my_node, ))
             matchmaker_p.start()
+            # time.sleep(5)
 
             add_log(my_node,"Starting Matchmaker", ty = "INFO")
 
-            my_node.pids['matchmaker'] = matchmaker_p.pid
             matchmaker_started = True
 
             crash_detector_p = Process(target = crash_detect, args = (my_node, ))
             crash_detector_p.start()
+            time.sleep(5)
 
             add_log(my_node,"Starting Crash Detector", ty = "INFO")
 
+            my_node.pids['matchmaker'] = matchmaker_p.pid
             my_node.pids['crash_detector'] = crash_detector_p.pid
             
         # if my_node.le_elected and start_daemons:

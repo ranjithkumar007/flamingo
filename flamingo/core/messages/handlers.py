@@ -42,20 +42,20 @@ def exec_job_handler(my_node, job):
 
 def query_files_handler(my_node, recv_ip, content):
 	job_id = content[0]
-	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "input")
-	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "executable")
+	send_file(content[1], to = recv_ip, job_id = job_id, file_ty = "input", my_node = my_node)
+	send_file(content[2], to = recv_ip, job_id = job_id, file_ty = "executable", my_node = my_node)
 
 def get_alive_node_handler(my_node, recv_ip, content):
 	not_ip, job_id = content
 
 	ip = get_random_alive_node(my_node, not_ip)
-	msg = Message('GET_ALIVE_NODE_ACK', content = ip)
+	msg = Message('GET_ALIVE_NODE_ACK', content = [ip, job_id])
 
 	send_msg(msg, to = recv_ip, my_node = my_node)
 
 def get_alive_node_ack_handler(my_node, content):
 	log_ip, job_id = content
-	send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log")		
+	send_file(os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log", my_node = my_node)	
 
 def log_file_handler(my_node, content):
 	job_id, file_ty, file_content = content
@@ -73,11 +73,12 @@ def completed_job_handler(my_node, recv_ip, content):
 	for i in range(len(my_node.running_jobs[recv_ip])):
 		if my_node.running_jobs[recv_ip][i].job_id == job_id:
 			j = i
+			break
 
-	if j:
+	if j != None:
 		my_node.running_jobs[recv_ip] = my_node.running_jobs[recv_ip][:j] + my_node.running_jobs[recv_ip][j+1:]
 	
-	if not job_id in my_node.completed_jobs:
+	if not job_id in my_node.completed_jobs.keys():
 		my_node.completed_jobs[job_id] = {}
 
 	my_node.completed_jobs[job_id]['turn_around_time'] = tat
@@ -103,7 +104,7 @@ def preempted_job_handler(my_node, recv_addr, content):
 def status_job_handler(my_node, recv_addr, content):
 	jobid = content[0]
 
-	reply = get_job_status(my_node)
+	reply = get_job_status(my_node, jobid)
 	
 	msg = Message('STATUS_REPLY',content = [jobid, reply])
 	send_msg(msg, to = recv_addr, my_node = my_node)
@@ -119,7 +120,7 @@ def status_reply_handler(my_node, content):
 
 def log_file_ack_handler(my_node, recv_ip, content):
 	job_id = content
-	if not job_id in my_node.completed_jobs:
+	if not job_id in my_node.completed_jobs.keys():
 		my_node.completed_jobs[job_id] = {}
 	
 	my_node.completed_jobs[job_id]['log_file_ip2'] = recv_ip
@@ -144,7 +145,7 @@ def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
 
 def backup_elect_handler(my_node):
-	my_node.backup_ip = get_random_alive_node(my_node) # my_node.adj_nodes_ips[0]
+	my_node.backup_ip = my_node.adj_nodes_ips[0] #get_random_alive_node(my_node) 
 	msg = Message('BACKUP_QUERY')
 	send_msg(msg, to = my_node.backup_ip, my_node = my_node)
 
@@ -168,12 +169,12 @@ def heartbeat_ack_handler(my_node):
 	my_node.last_jobs_sent = 0
 
 def display_output_handler(my_node, recv_ip, content):
-	job_id = content
+	job_id = content[0]
 	job_status = get_job_status(my_node, job_id)
 
-	if job_status != "Complete":
-		msg = Message('DISPLAY_OUTPUT_ACK',content = [jobid, job_status])
-		send_msg(msg, to = recv_addr, my_node = my_node)
+	if job_status != "Completed":
+		msg = Message('DISPLAY_OUTPUT_ACK',content = [job_id, job_status])
+		send_msg(msg, to = recv_ip, my_node = my_node)
 		return
 
 	to_addr = None
@@ -197,7 +198,7 @@ def display_output_handler(my_node, recv_ip, content):
 def fwd_display_output_handler(my_node, content):
 	source_ip, job_id = content
 
-	send_file(os.path.join(params.LOG_DIR, job_id), to = source_ip, job_id = job_id, file_ty = "fwd_display_output_ack")
+	send_file(os.path.join(params.LOG_DIR, job_id), to = source_ip, job_id = job_id, file_ty = "fwd_display_output_ack", my_node = my_node)
 
 def display_output_ack_handler(my_node, content):
 	print("Job id : %s status : %s; Output can be displayed only after it completes" % (content[0], content[1]))
@@ -206,7 +207,7 @@ def display_output_ack_handler(my_node, content):
 def fwd_display_output_ack_handler(my_node, content):
 	job_id, file_ty, file_content = content
 
-	print(file_content)
+	print(file_content.decode('UTF-8'))
 	os.kill(my_node.submit_interface_pid, signal.SIGUSR1)	
 
 	# see for backup
@@ -234,7 +235,7 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 	msg = Message('HEARTBEAT_ACK')
 	send_msg(msg, to = recv_ip, my_node = my_node)
 
-	knocker_p = Process(target = sleep_and_ping, args = (recv_ip, ))
+	knocker_p = Process(target = sleep_and_ping, args = (my_node, recv_ip))
 	knocker_p.start()
 	
 def le_terminate_handler(my_node):

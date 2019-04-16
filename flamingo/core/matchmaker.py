@@ -3,6 +3,7 @@ import sys
 from .messages.message import Message
 from .messages.utils import send_msg, get_resources
 from .jobs.utils import calculate_job_priority
+from .messages.utils import add_log
 
 MAX_RUNNING_JOBS_PER_NODE = 5
 COEFF_MIGRATION_COST = 5
@@ -14,7 +15,7 @@ def signal_handler(sig, frame):
 	if sig == signal.SIGUSR1:
 		pass
 
-def calc_matching_score(resources, num_running_jobs, is_source):
+def calc_matching_score(resources, num_running_jobs, is_source, mem):
 	total_cost = (1 - is_source) * COEFF_MIGRATION_COST + resources['cpu_usage'] * COEFF_CPU_USAGE \
 					+ resources['process_load'] * COEFF_AVG_PROC_LOAD + \
 						(1.0 / (resources['memory'] - mem)) * COEFF_FREE_MEM
@@ -75,7 +76,7 @@ def match(job, resources, running_jobs, lost_resources):
 				temp['cores'] += preempt_job[ip].attr['cores']
 				num_running_jobs -=1
 
-			cur_score = calc_matching_score(temp, len(running_jobs[ip]), ip == source_ip)
+			cur_score = calc_matching_score(temp, len(running_jobs[ip]), ip == source_ip, mem)
 
 			if cur_score < best_score:
 				best_score = cur_score
@@ -106,6 +107,7 @@ def matchmaking(my_node):
 
 			if assigned_ip and not preempt_job_id:
 				msg = Message('EXEC_JOB',content=job)
+				add_log(my_node, "Sending job id : " + job.job_id, ty = "INFO")
 				send_msg(msg,to = assigned_ip, my_node = my_node)
 
 				my_node.running_jobs[assigned_ip] = my_node.running_jobs[assigned_ip] + [job]
