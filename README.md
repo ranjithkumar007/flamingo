@@ -1,5 +1,5 @@
 # flamingo
 
 to run : 
-python main.py --self_ip 10.109.49.22 --adj_nodes_path inputs/neighbours.txt
+python main.py --adj_nodes_path inputs/neighbours.txt
 submit_job --filepath inputs/sample_jd

@@ -67,11 +67,14 @@ def main():
     my_node.lost_resources = manager.dict()
     my_node.pids = manager.dict()
 
+    my_node.leader_last_seen = manager.dict()
+
     my_node.log_q = manager.Queue()
     my_node.failed_msgs = manager.list()
     my_node.backup_state = manager.list()
 
     my_node.root_ip_dict = manager.dict()
+    my_node.backup_ip_dict = manager.dict()
 
     log_file = 'main_log_data.txt'
     logging_p = Process(target = start_logger, args = (my_node.log_q, log_file, "INFO"))
@@ -98,8 +101,8 @@ def main():
         msg = recv_msg(conn)
         
         ty = "INFO"
-        if 'HEARTBEAT' in msg.msg_type:
-            ty = "DEBUG" 
+        # if 'HEARTBEAT' in msg.msg_type:
+        #     ty = "DEBUG" 
 
         # print('received msg of type %s from %s' %(msg.msg_type, recv_addr))
         add_log(my_node, 'received msg of type %s from %s' %(msg.msg_type, recv_addr), ty)
@@ -116,6 +119,8 @@ def main():
             handlers.backup_query_handler(my_node)
             leader_crash_detector_p = Process(target = leader_crash_detect, args = (my_node, ))
             leader_crash_detector_p.start()
+            my_node.pids['leader_crash_detector'] = leader_crash_detector_p.pid
+
         elif msg.msg_type == 'EXEC_JOB':
             handlers.exec_job_handler(my_node, msg.content)
         elif msg.msg_type == 'QUERY_FILES':
@@ -167,6 +172,8 @@ def main():
             handlers.new_leader_handler(my_node,recv_addr,msg.content)
             matchmaker_p = Process(target = matchmaking, args = (my_node, ))
             matchmaker_p.start()
+
+            matchmaker_started = True
 
             add_log(my_node, "Starting Matchmaker", ty = "INFO")
 

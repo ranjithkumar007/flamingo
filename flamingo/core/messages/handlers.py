@@ -48,7 +48,7 @@ def query_files_handler(my_node, recv_ip, content):
 def get_alive_node_handler(my_node, recv_ip, content):
 	not_ip, job_id = content
 
-	ip = get_random_alive_node(my_node, not_ip)
+	ip = get_random_alive_node(my_node.resources, [not_ip, my_node.self_ip])
 	msg = Message('GET_ALIVE_NODE_ACK', content = [ip, job_id])
 
 	send_msg(msg, to = recv_ip, my_node = my_node)
@@ -61,6 +61,10 @@ def log_file_handler(my_node, content):
 	job_id, file_ty, file_content = content
 
 	log_path = os.path.join(params.LOG_DIR, job_id)
+
+	if not os.path.exists(params.LOG_DIR):
+		os.system("mkdir " + params.LOG_DIR)
+
 	with open(log_path, 'wb') as fp:
 		fp.write(file_content)
 
@@ -143,38 +147,39 @@ def files_content_handler(my_node, recv_ip, content):
 
 def backup_query_handler(my_node):
 	my_node.backup_ip = my_node.self_ip
-	my_node.leader_last_seen =  time.time()
+	my_node.backup_ip_dict['ip'] = my_node.self_ip
+	my_node.leader_last_seen['time'] =  time.time()
 	msg = Message('BACKUP_HEARTBEAT')
 	send_msg(msg, to = my_node.root_ip, my_node = my_node)
 
 def elect_new_leader_handler(my_node):
 	#need to elect new leader and send the state
 	resources = my_node.backup_state[3]
-	new_leader_ip = get_random_alive_node(resources, my_node.root_ip, my_node.self_ip)
+	new_leader_ip = get_random_alive_node(resources, [my_node.root_ip, my_node.self_ip])
 
 	#remove old leader from resources list
-	my_node.backup_state[3].remove(my_node.root_ip_dict['ip'])
+	del my_node.backup_state[3][my_node.root_ip_dict['ip']]
 
-	print("New leader elected with ip %s",new_leader_ip)
+	add_log(my_node, "New leader elected with ip " + new_leader_ip, ty = "INFO")
 
 	msg = Message('U_ARE_LEADER',content = my_node.backup_state)
-	send_msg(msg, to = new_leader_ip)
+	send_msg(msg, to = new_leader_ip, my_node = my_node)
 
 
 def backup_heartbeat_handler(my_node):
-
 	mystate = get_leaderstate(my_node)
 	msg = Message('BACKUP_HEARTBEAT_ACK',content = mystate)
 	send_msg(msg,to = my_node.backup_ip, my_node = my_node)
 
 def backup_heartbeat_ack_handler(my_node, content):
-	my_node.leader_last_seen = time.time()
+	my_node.leader_last_seen['time'] = time.time()
 	my_node.backup_state = content
 	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node, my_node.root_ip_dict['ip']))
 	knocker_p.start()
 
 def backup_elect_handler(my_node):
 	my_node.backup_ip = my_node.adj_nodes_ips[0] #get_random_alive_node(my_node) 
+	my_node.backup_ip_dict['ip'] = my_node.adj_nodes_ips[0]
 	msg = Message('BACKUP_QUERY')
 	send_msg(msg, to = my_node.backup_ip, my_node = my_node)
 
@@ -207,22 +212,21 @@ def display_output_handler(my_node, recv_ip, content):
 		return
 
 	to_addr = None
-	req_ip = None
-
+	
 	if ((my_node.completed_jobs[job_id]['log_file_ip1'] == recv_ip or \
 		my_node.completed_jobs[job_id]['log_file_ip2'] == recv_ip) and \
 		recv_ip in my_node.resources.keys()):
-		req_ip = recv_ip
 		to_addr = recv_ip
 	elif my_node.completed_jobs[job_id]['log_file_ip1'] in my_node.resources.keys():
 		to_addr = my_node.completed_jobs[job_id]['log_file_ip1']
+
 	elif my_node.completed_jobs[job_id]['log_file_ip2'] in my_node.resources.keys():
 		to_addr = my_node.completed_jobs[job_id]['log_file_ip2']
 	else:
 		print("Exception!! Flamingo supports only 1 fault. 2 faults detected")
 	
-	msg = Message('FWD_DISPLAY_OUTPUT', content = [req_ip, job_id])
-	send_msg(msg, to = recv_ip, my_node = my_node)
+	msg = Message('FWD_DISPLAY_OUTPUT', content = [recv_ip, job_id])
+	send_msg(msg, to = to_addr, my_node = my_node)
 
 def fwd_display_output_handler(my_node, content):
 	source_ip, job_id = content
@@ -295,9 +299,19 @@ def le_query_handler(my_node, recv_ip, new_root_ip):
 			msg = Message('LE_ACCEPT', content = my_node.root_ip)
 			send_msg(msg, to = my_node.par, my_node = my_node)
 
-	else:
+	elif not my_node.le_elected:
 		msg = Message('LE_REJECT', content = my_node.root_ip)
 		send_msg(msg, to = recv_ip, my_node = my_node)
+	else:
+		msg = Message('LE_FORCE_LEADER', content = my_node.root_ip)
+		send_msg(msg, to = recv_ip, my_node = my_node)		
+
+def le_force_leader_handler(my_node, recv_ip, new_root_ip):
+	my_node.le_elected = True
+	my_node.root_ip = new_root_ip
+	my_node.root_ip_dict['ip'] = my_node.root_ip
+	
+	send_heartbeat(my_node, to = my_node.root_ip)
 
 def le_accept_handler(my_node, recv_ip, new_root_ip, is_accept = True):
 	if my_node.root_ip == new_root_ip:
@@ -340,7 +354,7 @@ def new_leader_handler(my_node, recv_ip , content):
 	my_node.root_ip = my_node.self_ip
 	my_node.root_ip_dict['ip'] = my_node.self_ip
 	my_node.backup_ip = recv_ip
-
+	my_node.backup_ip_dict['ip'] = recv_ip
 
 	msg = Message("I_AM_NEWLEADER")
 
@@ -352,14 +366,13 @@ def i_am_newleader_handler(my_node,recv_ip):
 	my_node.root_ip = recv_ip
 	my_node.root_ip_dict['ip'] = recv_ip
 
-
 	#send failed messages
 
 	for msg in my_node.failed_msgs:
 		send_msg(msg,to = my_node.root_ip, my_node = my_node)
 
-
-
 	send_heartbeat(my_node, to = my_node.root_ip)
 
-
+	if my_node.self_ip == my_node.backup_ip:
+		my_node.leader_last_seen['time'] = time.time()
+		os.kill(my_node.pids['leader_crash_detector'], signal.SIGUSR1)

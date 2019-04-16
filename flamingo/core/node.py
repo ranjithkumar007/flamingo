@@ -19,6 +19,7 @@ class Node:
 		self.last_jobs_sent = 0
 
 		self.root_ip_dict = None
+		self.backup_ip_dict = None
 
 		self.log_q = None
 
@@ -45,6 +46,6 @@ class Node:
 
 
 		self.backup_state = []
-		self.leader_last_seen = None
+		self.leader_last_seen = {}
 
 		self.failed_msgs = []

@@ -16,7 +16,7 @@ def submit_interface(my_node, newstdin):
 	signal.signal(signal.SIGUSR1, signal_handler)
 
 	while True:
-		client_id = int(input('\n>>Enter your user id\n'))
+		client_id = int(input('\n>>Enter your user id : '))
 		# add authentication
 
 		while True:

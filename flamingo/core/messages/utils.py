@@ -13,7 +13,7 @@ import time
 from multiprocessing import Process
 
 def add_log(my_node, log, ty):
-    print(log)
+    # print(log)
     my_node.log_q.put((ty, log))
     os.kill(my_node.pids['logging'], signal.SIGUSR1)
 
@@ -77,10 +77,10 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 
     # send leader msg to remove this job from running Q
 
-def get_random_alive_node(my_node, not_ip = None):
+def get_random_alive_node(resources, not_ips = None):
     while 1:
-        ip = random.choice(my_node.resources.keys())
-        if ip != not_ip:
+        ip = random.choice(list(resources.keys()))
+        if not ip in not_ips:
             return ip
 
 def get_job_status(my_node, jobid): # expects my_node to be leader
@@ -171,14 +171,14 @@ def send_msg(msg, to, sock = None, my_node = None):
     sock.shutdown(socket.SHUT_WR)
     
     ty = "INFO"
-    if 'HEARTBEAT' in msg.msg_type:
-        ty = "DEBUG" 
+    # if 'HEARTBEAT' in msg.msg_type:
+    #     ty = "DEBUG" 
 
     add_log(my_node, 'sent msg of type %s to %s' % (msg.msg_type, to), ty)
-    print('sent msg of type %s to %s' % (msg.msg_type, to))
+    # print('sent msg of type %s to %s' % (msg.msg_type, to))
     
 def send_file(filepath, to, job_id, file_ty, my_node):
-    sock = create_socket(to)
+    sock = create_socket(to, my_node)
 
     if file_ty == 'log':
         msg_ty = 'LOG_FILE'

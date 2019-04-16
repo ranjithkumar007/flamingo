@@ -44,3 +44,9 @@ def crash_detect(my_node):
 			if flg:
 				os.kill(my_node.pids['matchmaker'], signal.SIGUSR1)
 
+			if my_node.backup_ip_dict['ip'] in crashed_nodes:
+				new_backup_ip = get_random_alive_node(resources, [my_node.root_ip, my_node.backup_ip_dict['ip']])
+				add_log(my_node, "New backup elected with ip " + new_backup_ip, ty = "INFO")
+
+				msg = Message('BACKUP_QUERY',)
+				send_msg(msg, to = new_backup_ip, my_node = my_node)

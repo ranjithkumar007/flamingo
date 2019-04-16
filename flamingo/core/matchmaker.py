@@ -24,15 +24,15 @@ def calc_matching_score(resources, num_running_jobs, is_source, mem):
 	return total_cost
 
 # decrement resources
-def match(job, resources, running_jobs, lost_resources):
-	mem = job.attr['max_memory']
-	cores = job.attr['cores']
-	source_ip = job.source_ip
+def match(njob, resources, running_jobs, lost_resources):
+	mem = njob.attr['max_memory']
+	cores = njob.attr['cores']
+	source_ip = njob.source_ip
 	
 	assigned_ip = None
 	preempt_job_id = None
 	
-	my_job_p = calculate_job_priority(job)
+	my_job_p = calculate_job_priority(njob)
 
 	preempt_job = {}
 
@@ -52,8 +52,8 @@ def match(job, resources, running_jobs, lost_resources):
 		for job in running_jobs[ip]:
 			job_p = calculate_job_priority(job)
 
-			if job_p < min_job_p and (get_mem(ip) + job.attr['max_memory']) >= mem and \
-						(get_cores(ip) + job.attr['cores']) >= cores:
+			if job_p < min_job_p and (get_mem(ip) + njob.attr['max_memory']) >= mem and \
+						(get_cores(ip) + njob.attr['cores']) >= cores:
 				min_job_p = job_p
 				min_job = job
 
@@ -104,7 +104,15 @@ def matchmaking(my_node):
 		while not my_node.leader_jobPQ.empty():
 			job = my_node.leader_jobPQ.get()
 			assigned_ip, preempt_job_id = match(job, my_node.resources, my_node.running_jobs, my_node.lost_resources)
-			my_node.leader_joblist.remove(job)
+			# my_node.leader_joblist.remove(job)
+			j = None
+			for i in range(len(my_node.leader_joblist)):
+				if job.job_id == my_node.leader_joblist[i].job_id:
+					j = i
+					break
+
+			if j is not None:
+				my_node.leader_joblist = my_node.leader_joblist[0:j] + my_node.leader_joblist[j+1:]
 
 			if assigned_ip and not preempt_job_id:
 				msg = Message('EXEC_JOB',content=job)
