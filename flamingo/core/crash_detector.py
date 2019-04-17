@@ -35,7 +35,7 @@ def crash_detect(my_node):
 					my_node.leader_jobPQ.put(job)
 					my_node.leader_joblist += [job]
 					flg = True
-					resched_job_ids.append(job_id)
+					resched_job_ids.append(job.job_id)
 
 				del my_node.running_jobs[ip]
 

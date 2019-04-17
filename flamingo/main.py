@@ -163,6 +163,8 @@ def main():
             handlers.backup_heartbeat_handler(my_node)
         elif msg.msg_type == 'BACKUP_HEARTBEAT_ACK':
             handlers.backup_heartbeat_ack_handler(my_node, msg.content)
+        elif msg.msg_type == 'LE_FORCE_LEADER':
+            handlers.le_force_leader_handler(my_node,recv_addr,msg.content)
         elif msg.msg_type == 'U_ARE_LEADER':
             my_node.running_jobs = manager.dict()
             my_node.leader_jobPQ = JobPQ(manager)

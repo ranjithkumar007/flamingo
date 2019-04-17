@@ -48,7 +48,7 @@ def query_files_handler(my_node, recv_ip, content):
 def get_alive_node_handler(my_node, recv_ip, content):
 	not_ip, job_id = content
 
-	ip = get_random_alive_node(my_node.resources, [not_ip, my_node.self_ip])
+	ip = get_random_alive_node(my_node.resources, [not_ip])
 	msg = Message('GET_ALIVE_NODE_ACK', content = [ip, job_id])
 
 	send_msg(msg, to = recv_ip, my_node = my_node)
