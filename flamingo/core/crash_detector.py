@@ -4,7 +4,8 @@ import sys
 import os
 
 from .recovery import params
-from .messages.utils import add_log
+from .messages.message import Message
+from .messages.utils import add_log, get_random_alive_node, send_msg
 
 def crash_detect(my_node):
 
@@ -35,7 +36,7 @@ def crash_detect(my_node):
 					my_node.leader_jobPQ.put(job)
 					my_node.leader_joblist += [job]
 					flg = True
-					resched_job_ids.append(job_id)
+					resched_job_ids.append(job.job_id)
 
 				del my_node.running_jobs[ip]
 
@@ -44,9 +45,12 @@ def crash_detect(my_node):
 			if flg:
 				os.kill(my_node.pids['matchmaker'], signal.SIGUSR1)
 
-			if my_node.backup_ip_dict['ip'] in crashed_nodes:
-				new_backup_ip = get_random_alive_node(resources, [my_node.root_ip, my_node.backup_ip_dict['ip']])
+			if my_node.ip_dict['backup'] in crashed_nodes:
+				new_backup_ip = get_random_alive_node(my_node.resources, [my_node.ip_dict['root'], my_node.ip_dict['backup']])
 				add_log(my_node, "New backup elected with ip " + new_backup_ip, ty = "INFO")
+
+				my_node.ip_dict['backup'] = new_backup_ip
 
 				msg = Message('BACKUP_QUERY',)
 				send_msg(msg, to = new_backup_ip, my_node = my_node)
+

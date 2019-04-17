@@ -59,7 +59,7 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
 
     add_log(my_node, "Completed job " + job_id, "INFO")
     msg = Message('COMPLETED_JOB', content = [job_id, job_run_time, tat])
-    send_msg(msg, to = my_node.root_ip, my_node = my_node)
+    send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
 
     del my_node.job_pid[job_id]
     os.system("rm -rf " + os.path.join(params.EXEC_DIR, job_id))
@@ -71,7 +71,7 @@ def exec_new_job(my_node, job_id, cmd, source_ip):
     log_ip = source_ip
     if source_ip == my_node.self_ip:
         msg = Message('GET_ALIVE_NODE', content = [source_ip, job_id])
-        send_msg(msg, to = my_node.root_ip, my_node = my_node)
+        send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
     else:
         send_file("../../" + os.path.join(params.LOG_DIR, job_id), to = log_ip, job_id = job_id, file_ty = "log", my_node = my_node)    
 

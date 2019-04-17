@@ -48,7 +48,7 @@ def query_files_handler(my_node, recv_ip, content):
 def get_alive_node_handler(my_node, recv_ip, content):
 	not_ip, job_id = content
 
-	ip = get_random_alive_node(my_node.resources, [not_ip, my_node.self_ip])
+	ip = get_random_alive_node(my_node.resources, [not_ip])
 	msg = Message('GET_ALIVE_NODE_ACK', content = [ip, job_id])
 
 	send_msg(msg, to = recv_ip, my_node = my_node)
@@ -69,7 +69,7 @@ def log_file_handler(my_node, content):
 		fp.write(file_content)
 
 	msg = Message('LOG_FILE_ACK', content = job_id)	
-	send_msg(msg, to = my_node.root_ip, my_node = my_node)
+	send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
 
 def completed_job_handler(my_node, recv_ip, content):
 	job_id, job_run_time, tat = content
@@ -146,19 +146,18 @@ def files_content_handler(my_node, recv_ip, content):
 		start_job(my_node, job_id, recv_ip)
 
 def backup_query_handler(my_node):
-	my_node.backup_ip = my_node.self_ip
-	my_node.backup_ip_dict['ip'] = my_node.self_ip
+	my_node.ip_dict['backup'] = my_node.self_ip
 	my_node.leader_last_seen['time'] =  time.time()
 	msg = Message('BACKUP_HEARTBEAT')
-	send_msg(msg, to = my_node.root_ip, my_node = my_node)
+	send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
 
 def elect_new_leader_handler(my_node):
 	#need to elect new leader and send the state
 	resources = my_node.backup_state[3]
-	new_leader_ip = get_random_alive_node(resources, [my_node.root_ip, my_node.self_ip])
+	new_leader_ip = get_random_alive_node(resources, [my_node.ip_dict['root'], my_node.self_ip])
 
 	#remove old leader from resources list
-	del my_node.backup_state[3][my_node.root_ip_dict['ip']]
+	del my_node.backup_state[3][my_node.ip_dict['root']]
 
 	add_log(my_node, "New leader elected with ip " + new_leader_ip, ty = "INFO")
 
@@ -169,24 +168,23 @@ def elect_new_leader_handler(my_node):
 def backup_heartbeat_handler(my_node):
 	mystate = get_leaderstate(my_node)
 	msg = Message('BACKUP_HEARTBEAT_ACK',content = mystate)
-	send_msg(msg,to = my_node.backup_ip, my_node = my_node)
+	send_msg(msg,to = my_node.ip_dict['backup'], my_node = my_node)
 
 def backup_heartbeat_ack_handler(my_node, content):
 	my_node.leader_last_seen['time'] = time.time()
 	my_node.backup_state = content
-	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node, my_node.root_ip_dict['ip']))
+	knocker_p = Process(target = sleep_and_ping_backup, args = (my_node, my_node.ip_dict['root']))
 	knocker_p.start()
 
 def backup_elect_handler(my_node):
-	my_node.backup_ip = my_node.adj_nodes_ips[0] #get_random_alive_node(my_node) 
-	my_node.backup_ip_dict['ip'] = my_node.adj_nodes_ips[0]
+	my_node.ip_dict['backup'] = my_node.adj_nodes_ips[0]
 	msg = Message('BACKUP_QUERY')
-	send_msg(msg, to = my_node.backup_ip, my_node = my_node)
+	send_msg(msg, to = my_node.ip_dict['backup'], my_node = my_node)
 
 def le_result_handler(my_node):
 	add_log(my_node, my_node.self_ip + " is the leader", "INFO")
 	my_node.le_elected = True
-	my_node.root_ip_dict['ip'] = my_node.self_ip
+	my_node.ip_dict['root'] = my_node.self_ip
 
 	msg = Message('LE_TERMINATE')
 	for ip in my_node.children:
@@ -250,6 +248,10 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 	# call matchmaker
 	node_jobQ, node_res = content
 	my_node.resources[recv_ip] = node_res
+
+	if not recv_ip in my_node.all_ips:
+		my_node.all_ips.append(recv_ip)
+
 	my_node.lost_resources[recv_ip] = {'memory' : 0, 'cores' : 0}
 	my_node.last_heartbeat_ts[recv_ip] = time.time()
 
@@ -276,57 +278,57 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 def le_terminate_handler(my_node):
 	msg = Message('LE_TERMINATE')
 	my_node.le_elected = True
-	my_node.root_ip_dict['ip'] = my_node.root_ip
+	my_node.ip_dict['root'] = my_node.ip_dict['root']
 
 	for ip in my_node.children:
 		send_msg(msg, to = ip, my_node = my_node)
 
-	send_heartbeat(my_node, to = my_node.root_ip)
+	send_heartbeat(my_node, to = my_node.ip_dict['root'])
 
 def le_query_handler(my_node, recv_ip, new_root_ip):
-	if not my_node.le_elected and my_node.root_ip < new_root_ip: 
-		my_node.root_ip = new_root_ip
+	if not my_node.le_elected and my_node.ip_dict['root'] < new_root_ip: 
+		my_node.ip_dict['root'] = new_root_ip
 		my_node.par = recv_ip
 		my_node.children = []
-		my_node.le_acks[my_node.root_ip] = 0
+		my_node.le_acks[my_node.ip_dict['root']] = 0
 
-		msg = Message('LE_QUERY', content = my_node.root_ip)
+		msg = Message('LE_QUERY', content = my_node.ip_dict['root'])
 		for ip in my_node.adj_nodes_ips:
 			if ip != recv_ip:
 				send_msg(msg, to = ip, my_node = my_node)
 
 		if len(my_node.adj_nodes_ips) == 1:
-			msg = Message('LE_ACCEPT', content = my_node.root_ip)
+			msg = Message('LE_ACCEPT', content = my_node.ip_dict['root'])
 			send_msg(msg, to = my_node.par, my_node = my_node)
 
 	elif not my_node.le_elected:
-		msg = Message('LE_REJECT', content = my_node.root_ip)
+		msg = Message('LE_REJECT', content = my_node.ip_dict['root'])
 		send_msg(msg, to = recv_ip, my_node = my_node)
 	else:
-		msg = Message('LE_FORCE_LEADER', content = my_node.root_ip)
+		msg = Message('LE_FORCE_LEADER', content = my_node.ip_dict['root'])
 		send_msg(msg, to = recv_ip, my_node = my_node)		
 
 def le_force_leader_handler(my_node, recv_ip, new_root_ip):
 	my_node.le_elected = True
-	my_node.root_ip = new_root_ip
-	my_node.root_ip_dict['ip'] = my_node.root_ip
+	my_node.ip_dict['root'] = new_root_ip
+	my_node.ip_dict['root'] = my_node.ip_dict['root']
 	
-	send_heartbeat(my_node, to = my_node.root_ip)
+	send_heartbeat(my_node, to = my_node.ip_dict['root'])
 
 def le_accept_handler(my_node, recv_ip, new_root_ip, is_accept = True):
-	if my_node.root_ip == new_root_ip:
+	if my_node.ip_dict['root'] == new_root_ip:
 		if is_accept:
 			my_node.children.append(recv_ip)
-		my_node.le_acks[my_node.root_ip] += 1
+		my_node.le_acks[my_node.ip_dict['root']] += 1
 			
-		if my_node.root_ip == my_node.self_ip and my_node.le_acks[my_node.root_ip] == len(my_node.adj_nodes_ips):
+		if my_node.ip_dict['root'] == my_node.self_ip and my_node.le_acks[my_node.ip_dict['root']] == len(my_node.adj_nodes_ips):
 			# leader election completed
 			backup_elect_handler(my_node)
 			# propogate that you are the finally elected leader
 			le_result_handler(my_node)
 			
-		if my_node.root_ip != my_node.self_ip and my_node.le_acks[my_node.root_ip] == (len(my_node.adj_nodes_ips) - 1):
-			msg = Message('LE_ACCEPT', content = my_node.root_ip)
+		if my_node.ip_dict['root'] != my_node.self_ip and my_node.le_acks[my_node.ip_dict['root']] == (len(my_node.adj_nodes_ips) - 1):
+			msg = Message('LE_ACCEPT', content = my_node.ip_dict['root'])
 			send_msg(msg, to = my_node.par, my_node = my_node)
 
 def le_reject_handler(my_node, recv_ip, new_root_ip):
@@ -337,6 +339,8 @@ def le_reject_handler(my_node, recv_ip, new_root_ip):
 def new_leader_handler(my_node, recv_ip , content):
 
 	my_node.all_ips = content[0]
+	my_node.all_ips.remove(my_node.ip_dict['root'])
+
 	my_node.completed_jobs = content[2]
 	resources = content[3]
 	for key in resources.keys():
@@ -351,10 +355,8 @@ def new_leader_handler(my_node, recv_ip , content):
 		my_node.leader_jobPQ.put(job)
 		my_node.leader_joblist += [job]
 
-	my_node.root_ip = my_node.self_ip
-	my_node.root_ip_dict['ip'] = my_node.self_ip
-	my_node.backup_ip = recv_ip
-	my_node.backup_ip_dict['ip'] = recv_ip
+	my_node.ip_dict['root'] = my_node.self_ip
+	my_node.ip_dict['backup'] = recv_ip
 
 	msg = Message("I_AM_NEWLEADER")
 
@@ -363,16 +365,20 @@ def new_leader_handler(my_node, recv_ip , content):
 
 def i_am_newleader_handler(my_node,recv_ip):
 
-	my_node.root_ip = recv_ip
-	my_node.root_ip_dict['ip'] = recv_ip
+	my_node.ip_dict['root'] = recv_ip
+	my_node.ip_dict['root'] = recv_ip
 
 	#send failed messages
 
 	for msg in my_node.failed_msgs:
-		send_msg(msg,to = my_node.root_ip, my_node = my_node)
+		send_msg(msg,to = my_node.ip_dict['root'], my_node = my_node)
 
-	send_heartbeat(my_node, to = my_node.root_ip)
+	tt = len(my_node.failed_msgs)
+	for i in range(tt):
+		del my_node.failed_msgs[i]
 
-	if my_node.self_ip == my_node.backup_ip:
+	send_heartbeat(my_node, to = my_node.ip_dict['root'])
+
+	if my_node.self_ip == my_node.ip_dict['backup']:
 		my_node.leader_last_seen['time'] = time.time()
 		os.kill(my_node.pids['leader_crash_detector'], signal.SIGUSR1)

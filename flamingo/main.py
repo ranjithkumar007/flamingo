@@ -73,8 +73,9 @@ def main():
     my_node.failed_msgs = manager.list()
     my_node.backup_state = manager.list()
 
-    my_node.root_ip_dict = manager.dict()
-    my_node.backup_ip_dict = manager.dict()
+    my_node.ip_dict = manager.dict()
+    my_node.ip_dict['root'] = self_ip
+    # my_node.backup_ip_dict = manager.dict()
 
     log_file = 'main_log_data.txt'
     logging_p = Process(target = start_logger, args = (my_node.log_q, log_file, "INFO"))
@@ -190,11 +191,13 @@ def main():
             handlers.elect_new_leader_handler(my_node)
         elif msg.msg_type == 'I_AM_NEWLEADER':
             handlers.i_am_newleader_handler(my_node,recv_addr)
+        elif msg.msg_type == 'LE_FORCE_LEADER':
+            handlers.le_force_leader_handler(my_node, recv_addr, content)
         else:
             add_log(my_node,"Message of unexpected msg type" + msg.msg_type, ty = "DEBUG")
 
 
-        if my_node.le_elected and my_node.self_ip == my_node.root_ip and not matchmaker_started:    
+        if my_node.le_elected and my_node.self_ip == my_node.ip_dict['root'] and not matchmaker_started:    
             
             my_node.running_jobs = manager.dict()
             my_node.leader_jobPQ = JobPQ(manager)

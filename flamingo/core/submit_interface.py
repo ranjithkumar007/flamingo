@@ -53,7 +53,7 @@ def submit_interface(my_node, newstdin):
 
 				jobid = slots[1]
 				msg = Message('STATUS_JOB',content = [jobid])
-				send_msg(msg, to = my_node.root_ip_dict['ip'], my_node = my_node)
+				send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
 				# Pause this process until response from leader arrives
 				signal.pause()
 					
@@ -64,7 +64,7 @@ def submit_interface(my_node, newstdin):
 
 				job_id = slots[1]
 				msg = Message('DISPLAY_OUTPUT', content = [job_id])
-				send_msg(msg, to = my_node.root_ip_dict['ip'], my_node = my_node)
+				send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
 
 				signal.pause()
 				pass
