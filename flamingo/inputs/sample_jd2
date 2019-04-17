@@ -1,0 +1,6 @@
+Name job_name
+max_memory 4
+cores 2
+exec_path inputs/small.out
+input_path inputs/inp
+priority 2

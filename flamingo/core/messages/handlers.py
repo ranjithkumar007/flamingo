@@ -252,6 +252,8 @@ def heartbeat_handler(my_node, recv_ip, content, manager):
 	my_node.resources[recv_ip] = node_res
 	my_node.lost_resources[recv_ip] = {'memory' : 0, 'cores' : 0}
 	my_node.last_heartbeat_ts[recv_ip] = time.time()
+	if not recv_ip in my_node.all_ips:
+		my_node.all_ips.append(recv_ip)
 
 	for job_i in node_jobQ:
 		my_node.leader_jobPQ.put(job_i)
@@ -337,6 +339,7 @@ def le_reject_handler(my_node, recv_ip, new_root_ip):
 def new_leader_handler(my_node, recv_ip , content):
 
 	my_node.all_ips = content[0]
+	my_node.all_ips.remove(my_node.root_ip)
 	my_node.completed_jobs = content[2]
 	resources = content[3]
 	for key in resources.keys():
@@ -370,6 +373,11 @@ def i_am_newleader_handler(my_node,recv_ip):
 
 	for msg in my_node.failed_msgs:
 		send_msg(msg,to = my_node.root_ip, my_node = my_node)
+
+
+	tt = len(my_node.failed_msgs)
+	for i in range(tt):
+		del my_node.failed_msgs[0]
 
 	send_heartbeat(my_node, to = my_node.root_ip)
 
