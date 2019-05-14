@@ -16,12 +16,12 @@ def submit_interface(my_node, newstdin):
 	signal.signal(signal.SIGUSR1, signal_handler)
 
 	while True:
-		client_id = int(input('\n>>Enter your user id\n'))
+		client_id = int(input('\n>>Enter your user id : '))
 		# add authentication
 
 		while True:
 			inp = input('\n>>')
-			print(inp)
+			# print(inp)
 			slots = inp.split(' ')
 			command = slots[0]
 
@@ -53,9 +53,20 @@ def submit_interface(my_node, newstdin):
 
 				jobid = slots[1]
 				msg = Message('STATUS_JOB',content = [jobid])
-				send_msg(msg, to = my_node.root_ip_dict['ip'])
+				send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
 				# Pause this process until response from leader arrives
 				signal.pause()
 					
-			else :
+			elif command == "display_output" : #works only when job is completed
+				if len(slots) == 1:
+					print("Jobid is not given")
+					continue
+
+				job_id = slots[1]
+				msg = Message('DISPLAY_OUTPUT', content = [job_id])
+				send_msg(msg, to = my_node.ip_dict['root'], my_node = my_node)
+
+				signal.pause()
 				pass
+
+
