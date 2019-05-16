@@ -9,3 +9,4 @@ distributed cluster middleware system
 - Fault tolerance(single fault) including general node failures and Master/Backup failure.
 - Leader Election(Asynchronous multiple initiator) to elect a master
 - Backup server(one backup for current master)
+- Adding new node
